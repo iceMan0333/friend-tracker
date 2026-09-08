@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  sentRequests     FriendRequest[] @relation("SentRequests")
+  receivedRequests FriendRequest[] @relation("ReceivedRequests")
+
+  friendshipsAsUser1 Friendship[] @relation("User1Friendships")
+  friendshipsAsUser2 Friendship[] @relation("User2Friendships")
+
+  activitiesCreated Activity[] @relation("ActivityCreator")
+  activityParticipations ActivityParticipant[]
+
+  messages Message[]
+
+}
+
+model FriendRequest {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+model Friendship {
+  id        Int      @id @default(autoincrement())
+  user1Id   Int
+  user2Id   Int
+  createdAt DateTime @default(now())
+
+  user1 User @relation("User1Friendships", fields: [user1Id], references: [id])
+  user2 User @relation("User2Friendships", fields: [user2Id], references: [id])
+
+  @@unique([user1Id, user2Id])
+}
+
+model Activity {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  creatorId   Int
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  creator      User                   @relation("ActivityCreator", fields: [creatorId], references: [id])
+  participants ActivityParticipant[]
+  occurrences  ActivityOccurrence[]
+}
+
+model ActivityParticipant {
+  id         Int @id @default(autoincrement())
+  activityId Int
+  userId     Int
+
+  activity Activity @relation(fields: [activityId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  completions ActivityCompletion[]
+
+  @@unique([activityId, userId])
+}
+
+model ActivityOccurrence {
+  id         Int      @id @default(autoincrement())
+  activityId Int
+  dueDate    DateTime
+
+  activity   Activity @relation(fields: [activityId], references: [id])
+  completions ActivityCompletion[]
+
+  @@unique([activityId, dueDate])
+}
+
+model ActivityCompletion {
+  id            Int      @id @default(autoincrement())
+  occurrenceId  Int
+  participantId Int
+  completedAt   DateTime @default(now())
+
+  occurrence  ActivityOccurrence @relation(fields: [occurrenceId], references: [id])
+  participant ActivityParticipant @relation(fields: [participantId], references: [id])
+
+  @@unique([occurrenceId, participantId])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  senderId  Int
+  content   String
+  createdAt DateTime @default(now())
+
+  sender User @relation(fields: [senderId], references: [id])
+}

@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { registerUser } from "@/app/actions/auth";
 import { EyeIcon, EyeOffIcon, ArrowRightIcon, SparklesIcon } from "./icons";
 
 interface AuthCardProps {
@@ -28,16 +30,90 @@ export function AuthCard({
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setStatusMessage(null);
 
-    // Simulated auth flow navigating to friends page
-    setTimeout(() => {
+    try {
+      if (mode === "register") {
+        // Enforce password criteria: min 8 chars, 1 uppercase, 1 number, 1 symbol
+        if (password.length < 8) {
+          setStatusMessage({ type: "error", text: "Password must be at least 8 characters long." });
+          setIsLoading(false);
+          return;
+        }
+        if (!/[A-Z]/.test(password)) {
+          setStatusMessage({ type: "error", text: "Password must contain at least one uppercase letter." });
+          setIsLoading(false);
+          return;
+        }
+        if (!/[0-9]/.test(password)) {
+          setStatusMessage({ type: "error", text: "Password must contain at least one number." });
+          setIsLoading(false);
+          return;
+        }
+        if (!/[^A-Za-z0-9]/.test(password)) {
+          setStatusMessage({ type: "error", text: "Password must contain at least one symbol (e.g. !@#$%^&*)." });
+          setIsLoading(false);
+          return;
+        }
+
+        // 1. Server Action: validate, bcrypt-hash, save to PostgreSQL via Prisma
+        const regResult = await registerUser({ name, email, password });
+        if (regResult.error) {
+          setStatusMessage({ type: "error", text: regResult.error });
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Sign in with the newly created credentials
+        const signInResult = await signIn("credentials", {
+          email: email.trim().toLowerCase(),
+          password,
+          redirect: false,
+        });
+
+        if (signInResult?.error) {
+          setStatusMessage({
+            type: "info",
+            text: "Account registered successfully. Please sign in with your password.",
+          });
+          setMode("login");
+          setIsLoading(false);
+          return;
+        }
+
+        // 3. Navigate to /friends with full session cookie handshake
+        window.location.href = "/friends";
+      } else {
+        // Sign In Flow
+        const result = await signIn("credentials", {
+          email: email.trim().toLowerCase(),
+          password,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setStatusMessage({
+            type: "error",
+            text: "Invalid email or password. Please check your credentials.",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Navigate to /friends with full session cookie handshake
+        window.location.href = "/friends";
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      setStatusMessage({
+        type: "error",
+        text: "An unexpected error occurred. Please try again.",
+      });
       setIsLoading(false);
-      router.push("/friends");
-    }, 400);
+    }
   };
 
   return (
@@ -210,8 +286,8 @@ export function AuthCard({
               </button>
             </div>
             {mode === "register" && (
-              <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                Minimum 8 characters with at least one number or symbol.
+              <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                Must be at least 8 characters and include at least one uppercase letter, one number, and one symbol.
               </p>
             )}
           </div>

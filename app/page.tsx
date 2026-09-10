@@ -1,16 +1,15 @@
 import { prisma } from "@/lib/prisma";
+import { LandingPageClient } from "@/components/landing-page-client";
+
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const userCount = await prisma.user.count();
+  let userCount = 0;
+  try {
+    userCount = await prisma.user.count();
+  } catch {
+    userCount = 0;
+  }
 
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold">Friend Tracker</h1>
-        <p className="mt-4">
-          Database connected! Users: {userCount}
-        </p>
-      </div>
-    </main>
-  );
+  return <LandingPageClient userCount={userCount} />;
 }

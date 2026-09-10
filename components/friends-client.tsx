@@ -246,9 +246,10 @@ export function FriendsClient({
                 {friends.map((friend) => (
                   <li
                     key={friend.id}
-                    className="flex items-center justify-between p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/50"
+                    className="flex items-center justify-between p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Avatar: ONLY clicking on the profile picture takes you to their profile */}
                       <Link
                         href={`/profile/${friend.id}`}
                         title={`View ${friend.name || friend.tag || "friend"}'s profile`}
@@ -268,20 +269,34 @@ export function FriendsClient({
                           />
                         )}
                       </Link>
-                      <div>
+
+                      {/* Clicking anywhere else on the friend item takes you to /friends/[id] */}
+                      <Link
+                        href={`/friends/${friend.id}`}
+                        className="flex-1 min-w-0 block hover:opacity-90 transition-opacity"
+                        title={`View shared activities and chat with ${friend.name || friend.tag || "friend"}`}
+                      >
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-white truncate">
                             {friend.name || friend.email}
                           </p>
                           {friend.tag && (
-                            <span className="text-xs font-mono font-medium text-indigo-400">
+                            <span className="text-xs font-mono font-medium text-indigo-400 shrink-0">
                               {friend.tag}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-zinc-500">{friend.email}</p>
-                      </div>
+                        <p className="text-xs text-zinc-500 truncate">{friend.email}</p>
+                      </Link>
                     </div>
+
+                    <Link
+                      href={`/friends/${friend.id}`}
+                      className="text-xs font-semibold text-zinc-500 hover:text-indigo-400 transition-colors pl-2"
+                      title="Open shared activities and chat"
+                    >
+                      →
+                    </Link>
                   </li>
                 ))}
               </ul>

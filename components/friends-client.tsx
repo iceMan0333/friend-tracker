@@ -14,6 +14,8 @@ interface Friend {
   id: string;
   email: string;
   name?: string;
+  tag?: string | null;
+  image?: string | null;
 }
 
 interface FriendRequestItem {
@@ -21,6 +23,8 @@ interface FriendRequestItem {
   senderId: string;
   senderName: string;
   senderEmail: string;
+  senderTag?: string | null;
+  senderImage?: string | null;
   createdAt: string;
 }
 
@@ -29,6 +33,8 @@ interface FriendsClientProps {
     name?: string | null;
     email?: string | null;
     id?: string;
+    tag?: string | null;
+    image?: string | null;
   };
   initialFriends?: Friend[];
   initialRequests?: FriendRequestItem[];
@@ -47,9 +53,9 @@ export function FriendsClient({
   const [friendRequests, setFriendRequests] =
     useState<FriendRequestItem[]>(initialRequests);
 
-  // Add friend by email form state
+  // Add friend by email or @tag form state
   const [isAdding, setIsAdding] = useState(false);
-  const [friendEmail, setFriendEmail] = useState("");
+  const [friendInput, setFriendInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inputError, setInputError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -60,24 +66,23 @@ export function FriendsClient({
     setSuccessMessage("");
     setIsSubmitting(true);
 
-    const email = friendEmail.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      setInputError("Please enter a valid email address.");
+    const query = friendInput.trim();
+    if (!query) {
+      setInputError("Please enter an email address or @user_tag.");
       setIsSubmitting(false);
       return;
     }
 
     try {
-      const res = await sendFriendRequest(email);
+      const res = await sendFriendRequest(query);
       if (res.error) {
         setInputError(res.error);
         setIsSubmitting(false);
         return;
       }
 
-      setSuccessMessage(res.message || `Friend request sent to ${email}!`);
-      setFriendEmail("");
+      setSuccessMessage(res.message || `Friend request sent to ${query}!`);
+      setFriendInput("");
       setIsAdding(false);
       setIsSubmitting(false);
       setTimeout(() => setSuccessMessage(""), 5000);
@@ -104,6 +109,8 @@ export function FriendsClient({
             id: acceptedReq.senderId,
             name: acceptedReq.senderName,
             email: acceptedReq.senderEmail,
+            tag: acceptedReq.senderTag,
+            image: acceptedReq.senderImage,
           },
         ]);
         setFriendRequests((prev) => prev.filter((r) => r.id !== requestId));
@@ -146,7 +153,7 @@ export function FriendsClient({
           </span>
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           {sessionUser && (
             <span className="text-xs text-zinc-400 hidden sm:inline">
               Logged in as{" "}
@@ -155,6 +162,12 @@ export function FriendsClient({
               </span>
             </span>
           )}
+          <Link
+            href="/profile"
+            className="text-xs font-semibold text-zinc-300 hover:text-white transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800"
+          >
+            <span>Profile</span>
+          </Link>
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/" })}
@@ -236,14 +249,37 @@ export function FriendsClient({
                     className="flex items-center justify-between p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/50"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 text-white font-semibold flex items-center justify-center text-sm ring-1 ring-white/10">
-                        {(friend.name || friend.email).charAt(0).toUpperCase()}
-                      </div>
+                      <Link
+                        href={`/profile/${friend.id}`}
+                        title={`View ${friend.name || friend.tag || "friend"}'s profile`}
+                        className="shrink-0 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full"
+                      >
+                        {friend.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={friend.image}
+                            alt={friend.name || "Friend avatar"}
+                            className="h-10 w-10 rounded-full object-cover border border-zinc-700 shrink-0"
+                          />
+                        ) : (
+                          <div
+                            className="h-10 w-10 rounded-full bg-zinc-600 border border-zinc-500/30 shadow-inner shrink-0"
+                            title="Default gray avatar"
+                          />
+                        )}
+                      </Link>
                       <div>
-                        <p className="text-sm font-medium text-white">
-                          {friend.name || friend.email}
-                        </p>
-                        <p className="text-xs text-zinc-400">{friend.email}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-white">
+                            {friend.name || friend.email}
+                          </p>
+                          {friend.tag && (
+                            <span className="text-xs font-mono font-medium text-indigo-400">
+                              {friend.tag}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-500">{friend.email}</p>
                       </div>
                     </div>
                   </li>
@@ -259,24 +295,23 @@ export function FriendsClient({
               >
                 <div>
                   <label
-                    htmlFor="friend-email"
+                    htmlFor="friend-input"
                     className="block text-xs font-semibold text-zinc-300 mb-1.5"
                   >
-                    Add Friend by Email
+                    Add Friend by Email or User Tag (@tag)
                   </label>
                   <input
-                    id="friend-email"
-                    type="email"
-                    inputMode="email"
+                    id="friend-input"
+                    type="text"
                     autoFocus
                     required
                     disabled={isSubmitting}
-                    value={friendEmail}
+                    value={friendInput}
                     onChange={(e) => {
-                      setFriendEmail(e.target.value);
+                      setFriendInput(e.target.value);
                       if (inputError) setInputError("");
                     }}
-                    placeholder="friend@example.com"
+                    placeholder="e.g. @alex or friend@example.com"
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
                 </div>
@@ -294,7 +329,7 @@ export function FriendsClient({
                     disabled={isSubmitting}
                     onClick={() => {
                       setIsAdding(false);
-                      setFriendEmail("");
+                      setFriendInput("");
                       setInputError("");
                     }}
                     className="rounded-lg border border-zinc-700 hover:bg-zinc-800 text-zinc-300 px-4 py-2 text-xs font-semibold transition-colors"
@@ -334,14 +369,42 @@ export function FriendsClient({
                     key={req.id}
                     className="flex items-center justify-between p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/50"
                   >
-                    <div>
-                      <p className="text-sm font-medium text-white">
-                        {req.senderName || req.senderEmail}
-                      </p>
-                      <p className="text-xs text-zinc-400">{req.senderEmail}</p>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/profile/${req.senderId}`}
+                        title={`View ${req.senderName || req.senderTag || "user"}'s profile`}
+                        className="shrink-0 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full"
+                      >
+                        {req.senderImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={req.senderImage}
+                            alt={req.senderName || "Sender avatar"}
+                            className="h-10 w-10 rounded-full object-cover border border-zinc-700 shrink-0"
+                          />
+                        ) : (
+                          <div
+                            className="h-10 w-10 rounded-full bg-zinc-600 border border-zinc-500/30 shadow-inner shrink-0"
+                            title="Default gray avatar"
+                          />
+                        )}
+                      </Link>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-white">
+                            {req.senderName || req.senderEmail}
+                          </p>
+                          {req.senderTag && (
+                            <span className="text-xs font-mono font-medium text-indigo-400">
+                              {req.senderTag}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-500">{req.senderEmail}</p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleAccept(req.id)}

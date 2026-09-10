@@ -22,15 +22,21 @@ export default async function FriendsPage() {
   const userId = parseInt(session.user.id, 10);
 
   // Fetch real accepted friendships from database
-  let initialFriends: { id: string; name: string; email: string }[] = [];
+  let initialFriends: {
+    id: string;
+    name: string;
+    email: string;
+    tag?: string | null;
+    image?: string | null;
+  }[] = [];
   try {
     const friendships = await prisma.friendship.findMany({
       where: {
         OR: [{ user1Id: userId }, { user2Id: userId }],
       },
       include: {
-        user1: { select: { id: true, name: true, email: true } },
-        user2: { select: { id: true, name: true, email: true } },
+        user1: { select: { id: true, name: true, email: true, tag: true, image: true } },
+        user2: { select: { id: true, name: true, email: true, tag: true, image: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -41,6 +47,8 @@ export default async function FriendsPage() {
         id: friend.id.toString(),
         name: friend.name,
         email: friend.email,
+        tag: friend.tag,
+        image: friend.image,
       };
     });
   } catch (err) {
@@ -53,6 +61,8 @@ export default async function FriendsPage() {
     senderId: string;
     senderName: string;
     senderEmail: string;
+    senderTag?: string | null;
+    senderImage?: string | null;
     createdAt: string;
   }[] = [];
 
@@ -63,7 +73,7 @@ export default async function FriendsPage() {
         status: "PENDING",
       },
       include: {
-        sender: { select: { id: true, name: true, email: true } },
+        sender: { select: { id: true, name: true, email: true, tag: true, image: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -73,6 +83,8 @@ export default async function FriendsPage() {
       senderId: r.sender.id.toString(),
       senderName: r.sender.name,
       senderEmail: r.sender.email,
+      senderTag: r.sender.tag,
+      senderImage: r.sender.image,
       createdAt: r.createdAt.toISOString(),
     }));
   } catch (err) {

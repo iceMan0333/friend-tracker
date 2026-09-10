@@ -38,6 +38,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id.toString(),
           name: user.name,
           email: user.email,
+          image: user.image,
+          tag: user.tag,
         };
       },
     }),
@@ -46,12 +48,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.tag = (user as unknown as { tag?: string }).tag;
       }
       return token;
     },
     session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        (session.user as unknown as { tag?: string }).tag = token.tag as string;
       }
       return session;
     },

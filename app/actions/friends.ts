@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function sendFriendRequest(receiverEmail: string) {
+export async function sendFriendRequest(target: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -12,22 +12,40 @@ export async function sendFriendRequest(receiverEmail: string) {
     }
 
     const currentUserId = parseInt(session.user.id, 10);
-    const normalizedEmail = receiverEmail?.trim().toLowerCase();
+    const query = target?.trim().toLowerCase();
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
-      return { error: "Please enter a valid email address." };
+    if (!query) {
+      return { error: "Please enter an email address or @user_tag." };
     }
 
-    // Look up receiver in PostgreSQL
-    const receiver = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+    let receiver = null;
+
+    if (query.startsWith("@")) {
+      // Look up by unique user tag
+      receiver = await prisma.user.findUnique({
+        where: { tag: query },
+      });
+    } else if (query.includes("@") && query.includes(".")) {
+      // Look up by email
+      receiver = await prisma.user.findUnique({
+        where: { email: query },
+      });
+      // Fallback check if user used email-like tag
+      if (!receiver) {
+        receiver = await prisma.user.findUnique({
+          where: { tag: query },
+        });
+      }
+    } else {
+      // Try with @ prepended
+      receiver = await prisma.user.findUnique({
+        where: { tag: "@" + query },
+      });
+    }
 
     if (!receiver) {
       return {
-        error: `No user found with email "${normalizedEmail}". Please ensure your friend has created an account first.`,
+        error: `No user found matching "${target}". Please check the tag or email.`,
       };
     }
 
@@ -90,9 +108,12 @@ export async function sendFriendRequest(receiverEmail: string) {
     }
 
     revalidatePath("/friends");
+    const displayName = receiver.tag
+      ? `${receiver.name} (${receiver.tag})`
+      : receiver.name || receiver.email;
     return {
       success: true,
-      message: `Friend request sent to ${receiver.name || receiver.email}!`,
+      message: `Friend request sent to ${displayName}!`,
     };
   } catch (error) {
     console.error("Error sending friend request:", error);

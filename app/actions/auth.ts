@@ -51,12 +51,21 @@ export async function registerUser({ name, email, password }: RegisterInput) {
     // Encrypt password using bcrypt with 12 salt rounds
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // Generate initial unique user tag starting with @
+    const baseTag = "@" + (trimmedName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "user");
+    let tag = baseTag;
+    const existingTag = await prisma.user.findUnique({ where: { tag } });
+    if (existingTag) {
+      tag = `${baseTag}${Math.floor(100 + Math.random() * 900)}`;
+    }
+
     // Save to PostgreSQL via Prisma
     await prisma.user.create({
       data: {
         name: trimmedName,
         email: normalizedEmail,
         passwordHash,
+        tag,
       },
     });
 

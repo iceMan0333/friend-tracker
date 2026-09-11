@@ -38,7 +38,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id.toString(),
           name: user.name,
           email: user.email,
-          image: user.image,
           tag: user.tag,
         };
       },
@@ -50,6 +49,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.tag = (user as unknown as { tag?: string }).tag;
       }
+      // Explicitly delete any picture/image properties to keep the JWT cookie small (< 500 bytes)
+      delete token.picture;
+      delete (token as Record<string, unknown>).image;
       return token;
     },
     session({ session, token }) {

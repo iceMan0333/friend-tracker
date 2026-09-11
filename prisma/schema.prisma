@@ -28,6 +28,8 @@ model User {
 
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+
+  punchIns ActivityPunchIn[]
 }
 
 model FriendRequest {
@@ -73,6 +75,7 @@ model Activity {
   receiver     User                   @relation("ActivityReceiver", fields: [receiverId], references: [id])
   participants ActivityParticipant[]
   occurrences  ActivityOccurrence[]
+  punchIns     ActivityPunchIn[]
 }
 
 model ActivityParticipant {
@@ -120,4 +123,17 @@ model Message {
 
   sender   User @relation("SentMessages", fields: [senderId], references: [id])
   receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+model ActivityPunchIn {
+  id         Int      @id @default(autoincrement())
+  activityId Int
+  userId     Int
+  punchDate  String   // "YYYY-MM-DD"
+  punchedAt  DateTime @default(now())
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId, punchDate])
 }

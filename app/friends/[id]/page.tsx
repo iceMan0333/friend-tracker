@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { FriendDetailClient } from "@/components/friend-detail-client";
+import { getSharedActivities } from "@/app/actions/activities";
+import { getDirectMessages } from "@/app/actions/messages";
 import { redirect, notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -70,59 +72,13 @@ export default async function FriendDetailPage({
   const friendUser = friendship.user1Id === currentUserId ? friendship.user2 : friendship.user1;
   const currentUser = friendship.user1Id === currentUserId ? friendship.user1 : friendship.user2;
 
-  // Load initial activities
-  const rawActivities = await prisma.activity.findMany({
-    where: {
-      OR: [
-        { creatorId: currentUserId, receiverId: friendId },
-        { creatorId: friendId, receiverId: currentUserId },
-      ],
-    },
-    include: {
-      creator: { select: { id: true, name: true, tag: true, image: true } },
-      receiver: { select: { id: true, name: true, tag: true, image: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  // Load initial activities with punch-in status and weekly progress
+  const activitiesRes = await getSharedActivities(friendId);
+  const initialActivities = activitiesRes.activities || [];
 
   // Load initial messages
-  const rawMessages = await prisma.message.findMany({
-    where: {
-      OR: [
-        { senderId: currentUserId, receiverId: friendId },
-        { senderId: friendId, receiverId: currentUserId },
-      ],
-    },
-    include: {
-      sender: { select: { id: true, name: true, tag: true, image: true } },
-    },
-    orderBy: { createdAt: "asc" },
-    take: 100,
-  });
-
-  const initialActivities = rawActivities.map((a) => ({
-    id: a.id,
-    title: a.title,
-    creatorId: a.creatorId,
-    receiverId: a.receiverId,
-    startDate: a.startDate.toISOString(),
-    endDate: a.endDate ? a.endDate.toISOString() : null,
-    frequency: a.frequency,
-    frequencyCount: a.frequencyCount,
-    status: a.status,
-    createdAt: a.createdAt.toISOString(),
-    creator: a.creator,
-    receiver: a.receiver,
-  }));
-
-  const initialMessages = rawMessages.map((m) => ({
-    id: m.id,
-    senderId: m.senderId,
-    receiverId: m.receiverId,
-    content: m.content,
-    createdAt: m.createdAt.toISOString(),
-    senderName: m.sender.name,
-  }));
+  const messagesRes = await getDirectMessages(friendId);
+  const initialMessages = messagesRes.messages || [];
 
   return (
     <FriendDetailClient

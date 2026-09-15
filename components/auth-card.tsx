@@ -85,7 +85,7 @@ export function AuthCard({
         }
 
         // 3. Navigate to /friends with full session cookie handshake
-        window.location.href = "/friends";
+        window.location.href = "/";
       } else {
         // Sign In Flow
         const result = await signIn("credentials", {
@@ -104,7 +104,7 @@ export function AuthCard({
         }
 
         // Navigate to /friends with full session cookie handshake
-        window.location.href = "/friends";
+        window.location.href = "/";
       }
     } catch (err) {
       console.error("Auth error:", err);

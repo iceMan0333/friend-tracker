@@ -4,16 +4,16 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export interface ProposeActivityInput {
+export interface ActivityProposalInput {
   friendId: number | string;
   title: string;
-  startDate: string;
-  endDate?: string;
-  frequency: "DAILY" | "X_TIMES_A_WEEK";
-  frequencyCount?: number;
+  startDate: string; // YYYY-MM-DD
+  endDate?: string;  // YYYY-MM-DD
+  frequency?: "DAILY" | "X_TIMES_A_WEEK";
+  frequencyCount?: number; // e.g. 3 for "3 times a week"
 }
 
-export async function proposeActivity(input: ProposeActivityInput) {
+export async function proposeActivity(input: ActivityProposalInput) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -21,48 +21,53 @@ export async function proposeActivity(input: ProposeActivityInput) {
     }
 
     const currentUserId = parseInt(session.user.id, 10);
-    const friendId = typeof input.friendId === "string" ? parseInt(input.friendId, 10) : input.friendId;
+    const friendId =
+      typeof input.friendId === "string"
+        ? parseInt(input.friendId, 10)
+        : input.friendId;
 
     if (currentUserId === friendId) {
-      return { error: "You cannot propose an activity to yourself." };
+      return { error: "You cannot track activities with yourself." };
     }
 
-    // Verify friendship
+    // Verify friendship exists and is confirmed
     const [user1Id, user2Id] =
-      currentUserId < friendId ? [currentUserId, friendId] : [friendId, currentUserId];
+      currentUserId < friendId
+        ? [currentUserId, friendId]
+        : [friendId, currentUserId];
 
     const friendship = await prisma.friendship.findUnique({
       where: { user1Id_user2Id: { user1Id, user2Id } },
     });
 
     if (!friendship) {
-      return { error: "You can only propose activities with confirmed friends." };
+      return { error: "You can only track activities with confirmed friends." };
     }
 
     const title = input.title?.trim();
     if (!title) {
-      return { error: "Please enter an activity name." };
+      return { error: "Activity title is required." };
     }
 
-    const startDate = input.startDate ? new Date(input.startDate) : new Date();
-    let endDate: Date | null = null;
-    if (input.endDate && input.endDate.trim() !== "") {
-      endDate = new Date(input.endDate);
-      if (endDate < startDate) {
-        return { error: "Finish date cannot be before the starting date." };
-      }
+    if (title.length > 100) {
+      return { error: "Activity title cannot exceed 100 characters." };
     }
 
-    let frequencyCount: number | null = null;
-    if (input.frequency === "X_TIMES_A_WEEK") {
-      frequencyCount = Number(input.frequencyCount) || 3;
-      if (frequencyCount < 1 || frequencyCount > 6) {
-        return { error: "Weekly frequency must be between 1 and 6 times per week." };
-      }
-    } else {
-      frequencyCount = 7; // Daily = 7 times a week
+    const startDate = input.startDate
+      ? new Date(input.startDate)
+      : new Date();
+    const endDate = input.endDate ? new Date(input.endDate) : null;
+
+    if (endDate && endDate < startDate) {
+      return { error: "Finish date cannot be earlier than starting date." };
     }
 
+    const frequencyCount =
+      input.frequency === "X_TIMES_A_WEEK"
+        ? Math.max(1, Math.min(6, Number(input.frequencyCount) || 3))
+        : null;
+
+    // Create Activity with PENDING status
     const activity = await prisma.activity.create({
       data: {
         title,
@@ -81,7 +86,22 @@ export async function proposeActivity(input: ProposeActivityInput) {
       },
     });
 
+    // Create Notification for the friend
+    await prisma.notification.create({
+      data: {
+        userId: friendId,
+        actorId: currentUserId,
+        type: "ACTIVITY_PROPOSAL",
+        title: "New Activity Proposal",
+        message: `${activity.creator.name} proposed to track "${activity.title}" with you.`,
+        link: `/friends/${currentUserId}`,
+        activityId: activity.id,
+      },
+    });
+
     revalidatePath(`/friends/${friendId}`);
+    revalidatePath("/notifications");
+    revalidatePath("/");
 
     return {
       success: true,
@@ -137,10 +157,36 @@ export async function acceptActivityProposal(activityId: number) {
     const updated = await prisma.activity.update({
       where: { id: activityId },
       data: { status: "ACCEPTED" },
+      include: {
+        creator: { select: { id: true, name: true } },
+        receiver: { select: { id: true, name: true } },
+      },
+    });
+
+    // Create Notification for the creator
+    await prisma.notification.create({
+      data: {
+        userId: activity.creatorId,
+        actorId: currentUserId,
+        type: "ACTIVITY_ACCEPTED",
+        title: "Proposal Accepted! 🎉",
+        message: `${updated.receiver.name} accepted your proposal to track "${updated.title}".`,
+        link: `/friends/${currentUserId}`,
+        activityId: activity.id,
+      },
+    });
+
+    // Mark any existing proposal notification for this activity as read
+    await prisma.notification.updateMany({
+      where: { activityId: activity.id, userId: currentUserId },
+      data: { isRead: true },
     });
 
     revalidatePath(`/friends/${activity.creatorId}`);
-    return { success: true, message: `Activity "${updated.title}" accepted!` };
+    revalidatePath("/notifications");
+    revalidatePath("/");
+
+    return { success: true, message: "Activity proposal accepted! You can now track it together." };
   } catch (error) {
     console.error("Error accepting proposal:", error);
     return { error: "Failed to accept activity proposal." };
@@ -164,8 +210,8 @@ export async function declineActivityProposal(activityId: number) {
       return { error: "Activity proposal not found." };
     }
 
-    if (activity.receiverId !== currentUserId && activity.creatorId !== currentUserId) {
-      return { error: "You are not authorized to modify this proposal." };
+    if (activity.creatorId !== currentUserId && activity.receiverId !== currentUserId) {
+      return { error: "You are not authorized to decline this proposal." };
     }
 
     await prisma.activity.delete({
@@ -174,6 +220,8 @@ export async function declineActivityProposal(activityId: number) {
 
     const otherUserId = activity.creatorId === currentUserId ? activity.receiverId : activity.creatorId;
     revalidatePath(`/friends/${otherUserId}`);
+    revalidatePath("/notifications");
+    revalidatePath("/");
 
     return {
       success: true,
@@ -249,6 +297,7 @@ export async function punchInActivity({
 
     const otherUserId = activity.creatorId === currentUserId ? activity.receiverId : activity.creatorId;
     revalidatePath(`/friends/${otherUserId}`);
+    revalidatePath("/");
 
     return {
       success: true,
@@ -320,9 +369,6 @@ export async function getSharedActivities(friendId: number | string, clientToday
         (p) => p.userId === friendIdNum && p.punchDate >= currentMonday && p.punchDate <= todayStr
       ).length;
 
-      // Determine if minimum frequency goal has been reached:
-      // For DAILY: both punched in today
-      // For X_TIMES_A_WEEK: both userWeekCount and friendWeekCount >= target count
       let isGoalReached = false;
       if (a.frequency === "DAILY") {
         isGoalReached = Boolean(userPunchToday && friendPunchToday);
@@ -368,7 +414,7 @@ export async function getActivityCalendarData(activityId: number) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return { error: "You must be signed in." };
+      return { error: "Unauthorized" };
     }
 
     const currentUserId = parseInt(session.user.id, 10);
@@ -376,19 +422,18 @@ export async function getActivityCalendarData(activityId: number) {
     const activity = await prisma.activity.findUnique({
       where: { id: activityId },
       include: {
-        creator: { select: { id: true, name: true, tag: true } },
-        receiver: { select: { id: true, name: true, tag: true } },
-        punchIns: {
-          include: {
-            user: { select: { id: true, name: true } },
-          },
-          orderBy: { punchedAt: "asc" },
-        },
+        creator: { select: { id: true, name: true } },
+        receiver: { select: { id: true, name: true } },
+        punchIns: true,
       },
     });
 
     if (!activity) {
       return { error: "Activity not found." };
+    }
+
+    if (activity.creatorId !== currentUserId && activity.receiverId !== currentUserId) {
+      return { error: "Unauthorized access to activity." };
     }
 
     const friendUser = activity.creatorId === currentUserId ? activity.receiver : activity.creator;
@@ -440,15 +485,183 @@ export async function getActivityCalendarData(activityId: number) {
         endDate: activity.endDate ? activity.endDate.toISOString().split("T")[0] : null,
         frequency: activity.frequency,
         frequencyCount: activity.frequencyCount,
+        creatorId: activity.creatorId,
+        receiverId: activity.receiverId,
       },
       currentUserName: currentUser.name,
       friendName: friendUser.name,
       target,
       punchMap,
       weekCounts,
+      calendarData: {
+        punchMap,
+        weekCounts,
+      },
     };
   } catch (error) {
-    console.error("Error loading calendar data:", error);
-    return { error: "Failed to load calendar data." };
+    console.error("Error getting activity calendar:", error);
+    return { error: "Failed to get calendar data." };
+  }
+}
+
+export async function getDashboardData(clientToday?: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "You must be signed in." };
+    }
+
+    const currentUserId = parseInt(session.user.id, 10);
+    const todayStr = clientToday?.trim() || new Date().toISOString().split("T")[0];
+    const currentMonday = getMonday(todayStr);
+
+    // 1. Fetch user details
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { id: true, name: true, email: true, tag: true, image: true, bio: true },
+    });
+
+    // 2. Fetch all accepted activities
+    const activities = await prisma.activity.findMany({
+      where: {
+        status: "ACCEPTED",
+        OR: [{ creatorId: currentUserId }, { receiverId: currentUserId }],
+      },
+      include: {
+        creator: { select: { id: true, name: true, tag: true, image: true } },
+        receiver: { select: { id: true, name: true, tag: true, image: true } },
+        punchIns: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // 3. Format activities
+    const formattedActivities = activities.map((a) => {
+      const isCreator = a.creatorId === currentUserId;
+      const friend = isCreator ? a.receiver : a.creator;
+
+      const userPunchToday = a.punchIns.find(
+        (p) => p.userId === currentUserId && p.punchDate === todayStr
+      );
+      const friendPunchToday = a.punchIns.find(
+        (p) => p.userId === friend.id && p.punchDate === todayStr
+      );
+
+      const userWeekCount = a.punchIns.filter(
+        (p) => p.userId === currentUserId && p.punchDate >= currentMonday && p.punchDate <= todayStr
+      ).length;
+      const friendWeekCount = a.punchIns.filter(
+        (p) => p.userId === friend.id && p.punchDate >= currentMonday && p.punchDate <= todayStr
+      ).length;
+
+      let isGoalReached = false;
+      if (a.frequency === "DAILY") {
+        isGoalReached = Boolean(userPunchToday && friendPunchToday);
+      } else {
+        const target = a.frequencyCount || 1;
+        isGoalReached = userWeekCount >= target && friendWeekCount >= target;
+      }
+
+      return {
+        id: a.id,
+        title: a.title,
+        startDate: a.startDate.toISOString(),
+        endDate: a.endDate ? a.endDate.toISOString() : null,
+        frequency: a.frequency,
+        frequencyCount: a.frequencyCount,
+        friend: {
+          id: friend.id,
+          name: friend.name,
+          tag: friend.tag,
+          image: friend.image,
+        },
+        hasUserPunchedToday: Boolean(userPunchToday),
+        userPunchedAt: userPunchToday ? userPunchToday.punchedAt.toISOString() : null,
+        hasFriendPunchedToday: Boolean(friendPunchToday),
+        friendPunchedAt: friendPunchToday ? friendPunchToday.punchedAt.toISOString() : null,
+        userWeekCount,
+        friendWeekCount,
+        isGoalReached,
+      };
+    });
+
+    // 4. Fetch all confirmed friendships for the story rail
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        OR: [{ user1Id: currentUserId }, { user2Id: currentUserId }],
+      },
+      include: {
+        user1: { select: { id: true, name: true, email: true, tag: true, image: true } },
+        user2: { select: { id: true, name: true, email: true, tag: true, image: true } },
+      },
+    });
+
+    const friendsList = friendships.map((f) => {
+      const friend = f.user1Id === currentUserId ? f.user2 : f.user1;
+      const sharedActs = formattedActivities.filter((act) => act.friend.id === friend.id);
+      const allDoneToday = sharedActs.length > 0 && sharedActs.every((act) => act.hasFriendPunchedToday);
+
+      return {
+        id: friend.id,
+        name: friend.name,
+        email: friend.email,
+        tag: friend.tag,
+        image: friend.image,
+        hasCompletedToday: allDoneToday,
+        sharedHabitsCount: sharedActs.length,
+      };
+    });
+
+    // 5. Fetch pending proposals & pending friend requests counts
+    const pendingProposals = await prisma.activity.findMany({
+      where: { receiverId: currentUserId, status: "PENDING" },
+      include: {
+        creator: { select: { id: true, name: true, tag: true, image: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const pendingFriendRequestsCount = await prisma.friendRequest.count({
+      where: { receiverId: currentUserId, status: "PENDING" },
+    });
+
+    const unreadNotificationsCount = await prisma.notification.count({
+      where: { userId: currentUserId, isRead: false },
+    });
+
+    return {
+      success: true,
+      currentUser: currentUser
+        ? {
+            id: currentUser.id.toString(),
+            name: currentUser.name,
+            email: currentUser.email,
+            tag: currentUser.tag,
+            image: currentUser.image,
+            bio: currentUser.bio,
+          }
+        : null,
+      activities: formattedActivities,
+      friends: friendsList,
+      pendingProposals: pendingProposals.map((p) => ({
+        id: p.id,
+        title: p.title,
+        frequency: p.frequency,
+        frequencyCount: p.frequencyCount,
+        creator: p.creator,
+        createdAt: p.createdAt.toISOString(),
+      })),
+      stats: {
+        totalActivities: formattedActivities.length,
+        completedTodayCount: formattedActivities.filter((a) => a.hasUserPunchedToday).length,
+        remainingTodayCount: formattedActivities.filter((a) => !a.hasUserPunchedToday).length,
+        pendingProposalsCount: pendingProposals.length,
+        pendingFriendRequestsCount,
+        unreadNotificationsCount,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+    return { error: "Failed to load dashboard data." };
   }
 }

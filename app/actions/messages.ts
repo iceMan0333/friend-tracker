@@ -123,3 +123,82 @@ export async function getDirectMessages(friendId: number | string) {
     return { error: "Failed to load messages.", messages: [] };
   }
 }
+
+export interface ConversationSummary {
+  friend: {
+    id: number;
+    name: string;
+    tag?: string | null;
+    image?: string | null;
+  };
+  latestMessage?: {
+    content: string;
+    createdAt: string;
+    isSenderMe: boolean;
+  } | null;
+}
+
+export async function getConversationsOverview() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", conversations: [] };
+    }
+
+    const currentUserId = parseInt(session.user.id, 10);
+
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        OR: [{ user1Id: currentUserId }, { user2Id: currentUserId }],
+      },
+      include: {
+        user1: { select: { id: true, name: true, tag: true, image: true } },
+        user2: { select: { id: true, name: true, tag: true, image: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const friends = friendships.map((f) => (f.user1Id === currentUserId ? f.user2 : f.user1));
+
+    const conversations: ConversationSummary[] = await Promise.all(
+      friends.map(async (friend) => {
+        const latest = await prisma.message.findFirst({
+          where: {
+            OR: [
+              { senderId: currentUserId, receiverId: friend.id },
+              { senderId: friend.id, receiverId: currentUserId },
+            ],
+          },
+          orderBy: { createdAt: "desc" },
+          select: {
+            content: true,
+            createdAt: true,
+            senderId: true,
+          },
+        });
+
+        return {
+          friend,
+          latestMessage: latest
+            ? {
+                content: latest.content,
+                createdAt: latest.createdAt.toISOString(),
+                isSenderMe: latest.senderId === currentUserId,
+              }
+            : null,
+        };
+      })
+    );
+
+    conversations.sort((a, b) => {
+      const timeA = a.latestMessage ? new Date(a.latestMessage.createdAt).getTime() : 0;
+      const timeB = b.latestMessage ? new Date(b.latestMessage.createdAt).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    return { success: true, conversations };
+  } catch (error) {
+    console.error("Error loading conversations:", error);
+    return { error: "Failed to load conversations.", conversations: [] };
+  }
+}

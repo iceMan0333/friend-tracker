@@ -107,7 +107,25 @@ export async function sendFriendRequest(target: string) {
       });
     }
 
+    // Create Notification for the receiver
+    const senderUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { name: true },
+    });
+    await prisma.notification.create({
+      data: {
+        userId: receiver.id,
+        actorId: currentUserId,
+        type: "FRIEND_REQUEST",
+        title: "New Friend Request",
+        message: `${senderUser?.name || "Someone"} sent you a friend request.`,
+        link: "/friends",
+      },
+    });
+
     revalidatePath("/friends");
+    revalidatePath("/notifications");
+    revalidatePath("/");
     const displayName = receiver.tag
       ? `${receiver.name} (${receiver.tag})`
       : receiver.name || receiver.email;
@@ -158,7 +176,25 @@ export async function acceptFriendRequest(requestId: string | number) {
       create: { user1Id, user2Id },
     });
 
+    // Create Notification for the sender
+    const receiverUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { name: true },
+    });
+    await prisma.notification.create({
+      data: {
+        userId: request.senderId,
+        actorId: currentUserId,
+        type: "FRIEND_ACCEPTED",
+        title: "Friend Request Accepted! 🤝",
+        message: `${receiverUser?.name || "Your friend"} accepted your friend request.`,
+        link: `/friends/${currentUserId}`,
+      },
+    });
+
     revalidatePath("/friends");
+    revalidatePath("/notifications");
+    revalidatePath("/");
     return {
       success: true,
       message: `You are now friends with ${request.sender.name || request.sender.email}!`,

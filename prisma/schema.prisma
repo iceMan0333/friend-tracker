@@ -30,6 +30,9 @@ model User {
   receivedMessages Message[] @relation("ReceivedMessages")
 
   punchIns ActivityPunchIn[]
+
+  notificationsReceived  Notification[] @relation("UserNotifications")
+  notificationsTriggered Notification[] @relation("ActorNotifications")
 }
 
 model FriendRequest {
@@ -76,6 +79,7 @@ model Activity {
   participants ActivityParticipant[]
   occurrences  ActivityOccurrence[]
   punchIns     ActivityPunchIn[]
+  notifications Notification[]
 }
 
 model ActivityParticipant {
@@ -136,4 +140,21 @@ model ActivityPunchIn {
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([activityId, userId, punchDate])
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  actorId    Int?
+  type       String   // "ACTIVITY_PROPOSAL", "ACTIVITY_ACCEPTED", "ACTIVITY_DECLINED", "FRIEND_REQUEST", "FRIEND_ACCEPTED"
+  title      String
+  message    String
+  link       String?
+  activityId Int?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user     User      @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  actor    User?     @relation("ActorNotifications", fields: [actorId], references: [id], onDelete: SetNull)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
 }

@@ -17,7 +17,7 @@ export async function generateMetadata({
   const { id } = await params;
   const friendId = parseInt(id, 10);
   if (isNaN(friendId)) {
-    return { title: "Friend — Friend Tracker" };
+    return { title: "Friend — Punchly" };
   }
 
   const friend = await prisma.user.findUnique({
@@ -26,7 +26,7 @@ export async function generateMetadata({
   });
 
   return {
-    title: friend ? `${friend.name} (${friend.tag || "@user"}) — Friend Tracker` : "Friend Tracker",
+    title: friend ? `${friend.name} (${friend.tag || "@user"}) — Punchly` : "Punchly",
   };
 }
 

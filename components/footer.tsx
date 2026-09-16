@@ -11,7 +11,7 @@ export function Footer() {
               <LogoIcon className="h-4 w-4 text-white" />
             </div>
             <span className="text-base font-bold text-zinc-900 dark:text-white">
-              Friend Tracker
+              Punchly
             </span>
           </div>
 
@@ -28,7 +28,7 @@ export function Footer() {
         </div>
 
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-          <p>© {new Date().getFullYear()} Friend Tracker. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Punchly. All rights reserved.</p>
           <p>
             Portfolio project created by{" "}
             <span className="font-semibold text-zinc-800 dark:text-zinc-200">

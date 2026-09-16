@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Friend Tracker — Stay Connected & Track Shared Habits",
+  title: "Punchly — Stay Connected & Track Shared Habits",
   description:
     "A full-stack collaborative platform for friends to build habits, schedule recurring activities, track completions, and keep streaks alive together.",
 };

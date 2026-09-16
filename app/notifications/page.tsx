@@ -6,7 +6,7 @@ import { NotificationsClient } from "@/components/notifications-client";
 import { getNotifications } from "@/app/actions/notifications";
 
 export const metadata: Metadata = {
-  title: "Notifications — Friend Tracker",
+  title: "Notifications — Punchly",
   description: "View activity proposals and notifications from your friends.",
 };
 

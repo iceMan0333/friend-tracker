@@ -17,12 +17,12 @@ export async function generateMetadata({
   const user = await getUserProfileByIdOrTag(id);
   if (!user) {
     return {
-      title: "User Not Found — Friend Tracker",
+      title: "User Not Found — Punchly",
     };
   }
   return {
-    title: `${user.name} (${user.tag || "@user"}) — Friend Tracker`,
-    description: user.bio || `View ${user.name}'s profile on Friend Tracker.`,
+    title: `${user.name} (${user.tag || "@user"}) — Punchly`,
+    description: user.bio || `View ${user.name}'s profile on Punchly.`,
   };
 }
 

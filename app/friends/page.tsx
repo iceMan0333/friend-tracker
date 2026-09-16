@@ -6,8 +6,8 @@ import type { Metadata } from "next";
 import { getUnreadNotificationCount } from "@/app/actions/notifications";
 
 export const metadata: Metadata = {
-  title: "Friends — Friend Tracker",
-  description: "View and manage your accountability friends on Friend Tracker.",
+  title: "Friends — Punchly",
+  description: "View and manage your accountability friends on Punchly.",
 };
 
 export const dynamic = "force-dynamic";

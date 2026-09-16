@@ -29,7 +29,7 @@ export function HeroSection({ authMode = "register" }: HeroSectionProps) {
             </h1>
 
             <p className="mt-6 text-base sm:text-lg text-zinc-600 dark:text-zinc-300 max-w-xl leading-relaxed">
-              Friend Tracker helps you and your friends commit to daily workouts,
+              Punchly helps you and your friends commit to daily workouts,
               coding goals, study sessions, and reading challenges together. Track
               individual completion, keep streaks alive, and cheer each other on.
             </p>

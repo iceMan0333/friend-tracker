@@ -16,7 +16,7 @@ export function Navbar() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-lg leading-tight tracking-tight bg-gradient-to-r from-zinc-900 to-zinc-700 dark:from-white dark:to-zinc-300 bg-clip-text text-transparent group-hover:from-indigo-600 group-hover:to-violet-600 dark:group-hover:from-indigo-400 dark:group-hover:to-violet-400 transition-all">
-              Friend Tracker
+              Punchly
             </span>
             <span className="text-[10px] font-medium uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Shared Accountability

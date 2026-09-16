@@ -5,8 +5,8 @@ import { LogoIcon } from "@/components/icons";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Create Account — Friend Tracker",
-  description: "Create your free Friend Tracker account and start tracking shared goals with friends.",
+  title: "Create Account — Punchly",
+  description: "Create your free Punchly account and start tracking shared goals with friends.",
 };
 
 export default function RegisterPage() {
@@ -27,7 +27,7 @@ export default function RegisterPage() {
             <LogoIcon className="h-6 w-6 text-white" />
           </div>
           <span className="text-xl font-bold tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-            Friend Tracker
+            Punchly
           </span>
         </Link>
       </div>

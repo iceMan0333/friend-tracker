@@ -7,8 +7,8 @@ import { getConversationsOverview } from "@/app/actions/messages";
 import { getUnreadNotificationCount } from "@/app/actions/notifications";
 
 export const metadata: Metadata = {
-  title: "Messages — Friend Tracker",
-  description: "Chat with your accountability friends on Friend Tracker.",
+  title: "Messages — Punchly",
+  description: "Chat with your accountability friends on Punchly.",
 };
 
 export const dynamic = "force-dynamic";

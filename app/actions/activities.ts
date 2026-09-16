@@ -176,10 +176,10 @@ export async function acceptActivityProposal(activityId: number) {
       },
     });
 
-    // Mark any existing proposal notification for this activity as read
+    // Mark any existing proposal notification for this activity as read and update type
     await prisma.notification.updateMany({
       where: { activityId: activity.id, userId: currentUserId },
-      data: { isRead: true },
+      data: { isRead: true, type: "ACTIVITY_ACCEPTED_DONE" },
     });
 
     revalidatePath(`/friends/${activity.creatorId}`);

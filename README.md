@@ -1,6 +1,6 @@
-# Friend Tracker
+# Punchly
 
-Friend Tracker is a full-stack web application designed to help friends stay connected, keep track of shared activities, and see each other's progress.
+Punchly is a full-stack web application designed to help friends stay connected, keep track of shared activities, and see each other's progress.
 
 The project is being built as a portfolio project with a focus on full-stack development, database design, authentication, real-time communication, and clean software architecture.
 

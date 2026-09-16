@@ -244,8 +244,10 @@ export function NotificationsClient({
         ) : (
           <div className="space-y-3">
             {filteredNotifications.map((n) => {
-              const isProposal = n.type === "ACTIVITY_PROPOSAL";
-              const isAcceptedDone = n.type === "ACTIVITY_ACCEPTED_DONE";
+              // An activity proposal is truly pending only if the activity status is PENDING and not yet accepted/declined
+              const isProposal = n.type === "ACTIVITY_PROPOSAL" && n.activity?.status === "PENDING";
+              const isAcceptedDone = n.type === "ACTIVITY_ACCEPTED_DONE" || (n.type === "ACTIVITY_PROPOSAL" && n.activity?.status === "ACCEPTED");
+              const isNoLongerAvailable = n.type === "ACTIVITY_PROPOSAL" && (!n.activity || n.activity.status === "DECLINED");
 
               return (
                 <div
@@ -335,13 +337,20 @@ export function NotificationsClient({
                         </div>
                       )}
 
-                      {/* State if proposal was just accepted in-session */}
+                      {/* State if proposal was accepted */}
                       {isAcceptedDone && (
-                        <div className="mt-2 text-xs font-semibold text-emerald-400 flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="mt-2 text-xs font-semibold text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg w-fit">
+                          <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <span>Habit accepted and added to your dashboard!</span>
+                          <span>Habit accepted & active</span>
+                        </div>
+                      )}
+
+                      {/* State if proposal is no longer available or was declined */}
+                      {isNoLongerAvailable && !isAcceptedDone && (
+                        <div className="mt-2 text-xs text-zinc-500 flex items-center gap-1.5 italic">
+                          <span>Proposal has ended or was declined</span>
                         </div>
                       )}
 

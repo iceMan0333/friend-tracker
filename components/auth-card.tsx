@@ -159,7 +159,7 @@ export function AuthCard({
         <div className="mb-5 text-center">
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
             {mode === "register"
-              ? "Join Your Friends on Friend Tracker"
+              ? "Join Your Friends on Punchly"
               : "Welcome Back"}
           </h2>
           <p className="mt-1.5 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
@@ -329,7 +329,7 @@ export function AuthCard({
             ) : (
               <>
                 <span>
-                  {mode === "register" ? "Create Free Account" : "Sign In to Friend Tracker"}
+                  {mode === "register" ? "Create Free Account" : "Sign In to Punchly"}
                 </span>
                 <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </>

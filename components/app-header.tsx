@@ -64,7 +64,7 @@ export function AppHeader({
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-base leading-tight tracking-tight text-white group-hover:text-indigo-400 transition-colors">
-              Friend Tracker
+              Punchly
             </span>
             <span className="text-[10px] font-medium uppercase tracking-wider text-indigo-400">
               Accountability

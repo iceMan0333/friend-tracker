@@ -5,8 +5,8 @@ import { LogoIcon } from "@/components/icons";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sign In — Friend Tracker",
-  description: "Sign in to your Friend Tracker account to view shared activities and friend progress.",
+  title: "Sign In — Punchly",
+  description: "Sign in to your Punchly account to view shared activities and friend progress.",
 };
 
 export default function LoginPage() {
@@ -27,7 +27,7 @@ export default function LoginPage() {
             <LogoIcon className="h-6 w-6 text-white" />
           </div>
           <span className="text-xl font-bold tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-            Friend Tracker
+            Punchly
           </span>
         </Link>
       </div>

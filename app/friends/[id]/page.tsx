@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { FriendDetailClient } from "@/components/friend-detail-client";
 import { getSharedActivities } from "@/app/actions/activities";
 import { getDirectMessages } from "@/app/actions/messages";
+import { getUnreadNotificationCount } from "@/app/actions/notifications";
 import { redirect, notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -57,13 +58,19 @@ export default async function FriendDetailPage({
   const [user1Id, user2Id] =
     currentUserId < friendId ? [currentUserId, friendId] : [friendId, currentUserId];
 
-  const friendship = await prisma.friendship.findUnique({
-    where: { user1Id_user2Id: { user1Id, user2Id } },
-    include: {
-      user1: { select: { id: true, name: true, email: true, tag: true, image: true, bio: true } },
-      user2: { select: { id: true, name: true, email: true, tag: true, image: true, bio: true } },
-    },
-  });
+  const [friendship, unreadNotifs, pendingRequestsCount] = await Promise.all([
+    prisma.friendship.findUnique({
+      where: { user1Id_user2Id: { user1Id, user2Id } },
+      include: {
+        user1: { select: { id: true, name: true, email: true, tag: true, image: true, bio: true } },
+        user2: { select: { id: true, name: true, email: true, tag: true, image: true, bio: true } },
+      },
+    }),
+    getUnreadNotificationCount(),
+    prisma.friendRequest.count({
+      where: { receiverId: currentUserId, status: "PENDING" },
+    }),
+  ]);
 
   if (!friendship) {
     redirect("/friends");
@@ -99,6 +106,8 @@ export default async function FriendDetailPage({
       }}
       initialActivities={initialActivities}
       initialMessages={initialMessages}
+      unreadNotifications={unreadNotifs}
+      pendingRequests={pendingRequestsCount}
     />
   );
 }

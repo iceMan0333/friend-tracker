@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { FriendsClient } from "@/components/friends-client";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getUnreadNotificationCount } from "@/app/actions/notifications";
 
 export const metadata: Metadata = {
   title: "Friends — Friend Tracker",
@@ -21,7 +22,7 @@ export default async function FriendsPage() {
 
   const userId = parseInt(session.user.id, 10);
 
-  // Fetch real accepted friendships from database
+  // Fetch friendships, friend requests, and unread notifications concurrently
   let initialFriends: {
     id: string;
     name: string;
@@ -29,17 +30,41 @@ export default async function FriendsPage() {
     tag?: string | null;
     image?: string | null;
   }[] = [];
+  let initialRequests: {
+    id: string;
+    senderId: string;
+    senderName: string;
+    senderEmail: string;
+    senderTag?: string | null;
+    senderImage?: string | null;
+    createdAt: string;
+  }[] = [];
+  let unreadNotificationsCount = 0;
+
   try {
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [{ user1Id: userId }, { user2Id: userId }],
-      },
-      include: {
-        user1: { select: { id: true, name: true, email: true, tag: true, image: true } },
-        user2: { select: { id: true, name: true, email: true, tag: true, image: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const [friendships, pendingRequests, unreadCount] = await Promise.all([
+      prisma.friendship.findMany({
+        where: {
+          OR: [{ user1Id: userId }, { user2Id: userId }],
+        },
+        include: {
+          user1: { select: { id: true, name: true, email: true, tag: true, image: true } },
+          user2: { select: { id: true, name: true, email: true, tag: true, image: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.friendRequest.findMany({
+        where: {
+          receiverId: userId,
+          status: "PENDING",
+        },
+        include: {
+          sender: { select: { id: true, name: true, email: true, tag: true, image: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      getUnreadNotificationCount(),
+    ]);
 
     initialFriends = friendships.map((f) => {
       const friend = f.user1Id === userId ? f.user2 : f.user1;
@@ -51,32 +76,6 @@ export default async function FriendsPage() {
         image: friend.image,
       };
     });
-  } catch (err) {
-    console.error("Error loading friendships:", err);
-  }
-
-  // Fetch real pending friend requests received by this user
-  let initialRequests: {
-    id: string;
-    senderId: string;
-    senderName: string;
-    senderEmail: string;
-    senderTag?: string | null;
-    senderImage?: string | null;
-    createdAt: string;
-  }[] = [];
-
-  try {
-    const pendingRequests = await prisma.friendRequest.findMany({
-      where: {
-        receiverId: userId,
-        status: "PENDING",
-      },
-      include: {
-        sender: { select: { id: true, name: true, email: true, tag: true, image: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
 
     initialRequests = pendingRequests.map((r) => ({
       id: r.id.toString(),
@@ -87,8 +86,10 @@ export default async function FriendsPage() {
       senderImage: r.sender.image,
       createdAt: r.createdAt.toISOString(),
     }));
+
+    unreadNotificationsCount = unreadCount;
   } catch (err) {
-    console.error("Error loading friend requests:", err);
+    console.error("Error loading friends page data:", err);
   }
 
   return (
@@ -96,6 +97,7 @@ export default async function FriendsPage() {
       sessionUser={session.user}
       initialFriends={initialFriends}
       initialRequests={initialRequests}
+      unreadNotifications={unreadNotificationsCount}
     />
   );
 }

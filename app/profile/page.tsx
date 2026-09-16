@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ProfileClient } from "@/components/profile-client";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getUnreadNotificationCount } from "@/app/actions/notifications";
 
 export const metadata: Metadata = {
   title: "Profile — Friend Tracker",
@@ -19,17 +20,24 @@ export default async function ProfilePage() {
   }
 
   const userId = parseInt(session.user.id, 10);
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      tag: true,
-      image: true,
-      bio: true,
-    },
-  });
+
+  const [user, unreadNotifs, pendingRequestsCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        tag: true,
+        image: true,
+        bio: true,
+      },
+    }),
+    getUnreadNotificationCount(),
+    prisma.friendRequest.count({
+      where: { receiverId: userId, status: "PENDING" },
+    }),
+  ]);
 
   if (!user) {
     redirect("/");
@@ -66,6 +74,10 @@ export default async function ProfilePage() {
         image: user.image,
         bio: user.bio,
       }}
+      sessionUser={session.user}
+      unreadNotifications={unreadNotifs}
+      pendingRequests={pendingRequestsCount}
+      isOwnProfile={true}
     />
   );
 }

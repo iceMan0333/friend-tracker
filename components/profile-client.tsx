@@ -3,7 +3,9 @@
 import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { LogoIcon, SparklesIcon, ShieldCheckIcon } from "./icons";
+import { SparklesIcon, ShieldCheckIcon } from "./icons";
+import { AppHeader } from "./app-header";
+import { BottomNav } from "./bottom-nav";
 import { updateProfile } from "@/app/actions/profile";
 
 interface ProfileUser {
@@ -18,11 +20,23 @@ interface ProfileUser {
 interface ProfileClientProps {
   user: ProfileUser;
   isOwnProfile?: boolean;
+  sessionUser?: {
+    id?: string | number;
+    name?: string | null;
+    email?: string | null;
+    tag?: string | null;
+    image?: string | null;
+  } | null;
+  unreadNotifications?: number;
+  pendingRequests?: number;
 }
 
 export function ProfileClient({
   user,
   isOwnProfile = true,
+  sessionUser,
+  unreadNotifications = 0,
+  pendingRequests = 0,
 }: ProfileClientProps) {
   // Read-only vs Editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -174,53 +188,14 @@ export function ProfileClient({
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Top Header */}
-      <header className="border-b border-zinc-900 bg-[#0a0a0a]/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/friends"
-            className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5"
-          >
-            <span>← Friends</span>
-          </Link>
-          <span className="text-zinc-700">|</span>
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-white hover:opacity-90 transition-opacity"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
-              <LogoIcon className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-bold text-sm tracking-tight hidden sm:inline">
-              Friend Tracker
-            </span>
-          </Link>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {isOwnProfile && !isEditing && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditing(true);
-                setStatusMessage(null);
-              }}
-              className="rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-semibold px-3 py-1.5 text-white transition-colors"
-            >
-              Edit Profile
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="text-xs text-zinc-400 hover:text-white transition-colors"
-          >
-            Log Out
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-24 md:pb-12">
+      {/* Universal App Header with Top Navigation Bar */}
+      <AppHeader
+        sessionUser={sessionUser || (isOwnProfile ? savedUser : undefined)}
+        unreadNotifications={unreadNotifications}
+        pendingRequests={pendingRequests}
+        activeTab="profile"
+      />
 
       {/* Main Content */}
       <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 py-10 sm:py-16">
@@ -492,6 +467,12 @@ export function ProfileClient({
           </form>
         )}
       </main>
+
+      <BottomNav
+        activeTab="profile"
+        unreadNotifications={unreadNotifications}
+        pendingRequests={pendingRequests}
+      />
     </div>
   );
 }

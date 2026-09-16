@@ -1,8 +1,10 @@
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { getUserProfileByIdOrTag } from "@/app/actions/profile";
 import { ProfileClient } from "@/components/profile-client";
 import { redirect, notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { getUnreadNotificationCount } from "@/app/actions/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +37,16 @@ export default async function UserProfilePage({
     redirect("/");
   }
 
+  const currentUserId = parseInt(session.user.id, 10);
   const { id } = await params;
-  const user = await getUserProfileByIdOrTag(id);
+
+  const [user, unreadNotifs, pendingRequestsCount] = await Promise.all([
+    getUserProfileByIdOrTag(id),
+    getUnreadNotificationCount(),
+    prisma.friendRequest.count({
+      where: { receiverId: currentUserId, status: "PENDING" },
+    }),
+  ]);
 
   if (!user) {
     notFound();
@@ -48,6 +58,9 @@ export default async function UserProfilePage({
     <ProfileClient
       user={user}
       isOwnProfile={isOwnProfile}
+      sessionUser={session.user}
+      unreadNotifications={unreadNotifs}
+      pendingRequests={pendingRequestsCount}
     />
   );
 }

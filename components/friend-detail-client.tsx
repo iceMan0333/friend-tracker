@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { AppHeader } from "./app-header";
-import { BottomNav } from "./bottom-nav";
 import { CalendarIcon, CheckCircleIcon, XIcon } from "./icons";
 import {
   proposeActivity,
@@ -172,7 +171,43 @@ export function FriendDetailClient({
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
   const prevMessagesCountRef = useRef(messages.length);
 
-  // Scoped Auto-Scroll (Strictly inside chat messages div ONLY)
+  // Dynamic visual viewport height to guarantee 100% fit on mobile with on-screen keyboard
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateHeight = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+      if (chatMessagesContainerRef.current) {
+        chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
+      }
+    };
+
+    updateHeight();
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", updateHeight);
+      window.visualViewport.addEventListener("scroll", updateHeight);
+    } else {
+      window.addEventListener("resize", updateHeight);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", updateHeight);
+        window.visualViewport.removeEventListener("scroll", updateHeight);
+      } else {
+        window.removeEventListener("resize", updateHeight);
+      }
+    };
+  }, []);
+
+  // Scoped Auto-Scroll: strictly inside the chat feed div
   useEffect(() => {
     if (!chatMessagesContainerRef.current) return;
     const isNew = messages.length > prevMessagesCountRef.current;
@@ -382,12 +417,9 @@ export function FriendDetailClient({
   const pendingActivities = activities.filter((a) => a.status === "PENDING");
   const acceptedActivities = activities.filter((a) => a.status === "ACCEPTED");
 
-  // SEPARATE ACTIVE HABITS VS EXPIRED/ARCHIVED HABITS
-  // Habits with an endDate in the past are expired/completed goals
+  // Separate active vs archived
   const activeActivities = acceptedActivities.filter((a) => !a.endDate || a.endDate >= todayStr);
   const archivedActivities = acceptedActivities.filter((a) => a.endDate && a.endDate < todayStr);
-
-  // Active activities needing punch in today by user
   const uncompletedTodayActivities = activeActivities.filter((a) => !a.hasUserPunchedToday);
 
   // Calendar render days
@@ -493,9 +525,12 @@ export function FriendDetailClient({
   };
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-indigo-500 selection:text-white overflow-hidden">
-      {/* Universal Top Navigation Header */}
-      <div className="shrink-0">
+    <div
+      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+      className="fixed inset-0 w-full bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-indigo-500 selection:text-white overflow-hidden overscroll-none"
+    >
+      {/* 1. Universal Desktop Header (Hidden on mobile so chat gets 100% of the screen!) */}
+      <div className="hidden md:block shrink-0">
         <AppHeader
           sessionUser={sessionUser}
           unreadNotifications={unreadNotifications}
@@ -504,24 +539,24 @@ export function FriendDetailClient({
         />
       </div>
 
-      {/* Friend Subheader Bar */}
-      <div className="shrink-0 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/80 px-3 sm:px-6 py-2.5 sm:py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          {/* Left: Back Link & Friend Profile Info */}
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      {/* 2. Friend Chat Top Bar (Always visible at top of screen) */}
+      <header className="shrink-0 bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-800/80 px-3 sm:px-6 py-2 sm:py-3 z-30">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5">
+          {/* Left: Back button & Friend Info */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link
-              href="/friends"
-              className="p-1.5 -ml-1 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition active:scale-95 shrink-0"
-              title="Back to Friends"
+              href="/messages"
+              className="p-1.5 -ml-1 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/70 transition active:scale-95 shrink-0"
+              title="Back to Messages"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
 
             <Link
               href={`/profile/${friend.id}`}
-              className="flex items-center gap-2.5 min-w-0 group hover:opacity-90 transition"
+              className="flex items-center gap-2 sm:gap-2.5 min-w-0 group hover:opacity-90 transition"
               title={`View ${friend.name}'s profile`}
             >
               <div className="relative shrink-0">
@@ -529,45 +564,45 @@ export function FriendDetailClient({
                   <img
                     src={friend.image}
                     alt={friend.name}
-                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-indigo-500 shadow-sm"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-indigo-500 shadow-sm"
                   />
                 ) : (
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm">
                     {friend.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
               </div>
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 truncate">
-                  <span className="font-bold text-xs sm:text-base text-white group-hover:text-indigo-300 transition truncate">
+                  <span className="font-bold text-sm sm:text-base text-white group-hover:text-indigo-300 transition truncate">
                     {friend.name}
                   </span>
                   {friend.tag && (
-                    <span className="text-[11px] font-mono text-indigo-400 hidden sm:inline truncate">
+                    <span className="text-[10px] sm:text-xs font-mono text-indigo-400 truncate">
                       {friend.tag}
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] sm:text-[11px] text-zinc-400 truncate">
-                  {activeActivities.length} active · {archivedActivities.length} archived
+                <p className="text-[10px] text-zinc-400 truncate">
+                  {activeActivities.length} active · {archivedActivities.length} completed
                 </p>
               </div>
             </Link>
           </div>
 
-          {/* Right Actions: Red Pending Proposals Button & Mobile Tab Switcher */}
+          {/* Right Actions: Red Pending Proposals Button & Mobile Segmented Toggle */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* RED PENDING PROPOSALS ICON */}
+            {/* RED PENDING PROPOSALS ICON: only shows when pending proposals exist */}
             {pendingActivities.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowProposalsHover(true)}
-                className="relative inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold text-rose-300 bg-rose-500/20 border border-rose-500/40 shadow-lg shadow-rose-500/20 hover:bg-rose-500/30 transition active:scale-95 animate-pulse"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-rose-300 bg-rose-500/20 border border-rose-500/40 shadow-lg shadow-rose-500/20 hover:bg-rose-500/30 transition active:scale-95 animate-pulse"
                 title="View Pending Proposals"
               >
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
                 <svg className="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                 </svg>
@@ -575,7 +610,7 @@ export function FriendDetailClient({
               </button>
             )}
 
-            {/* Mobile Segmented View Toggle (Chat vs Habits) */}
+            {/* Mobile View Switcher (Chat vs Habits) */}
             <div className="flex lg:hidden bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 text-xs font-medium">
               <button
                 type="button"
@@ -598,20 +633,20 @@ export function FriendDetailClient({
                 }`}
               >
                 <span>Habits</span>
-                <span className="text-[10px] bg-zinc-800 px-1.5 py-0.2 rounded-full text-zinc-300">
+                <span className="text-[10px] bg-zinc-800 px-1.5 py-0.2 rounded-full text-zinc-300 font-bold">
                   {acceptedActivities.length}
                 </span>
               </button>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content Layout: Exact flex-1 min-h-0 container for zero outer scrolling */}
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-2 sm:py-4">
-        {/* Status Alerts (Auto dismiss) */}
+      {/* 3. Main Body: Exact flex-1 min-h-0 container */}
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row max-w-7xl w-full mx-auto p-0 sm:p-4 lg:p-6 gap-0 lg:gap-4 overflow-hidden">
+        {/* Status Alerts */}
         {activitySuccess && (
-          <div className="shrink-0 mb-2 rounded-xl bg-emerald-950/80 border border-emerald-500/40 p-2.5 text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
+          <div className="shrink-0 m-2 sm:m-0 sm:mb-1 rounded-xl bg-emerald-950/80 border border-emerald-500/40 px-3 py-2 text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
             <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
@@ -619,7 +654,7 @@ export function FriendDetailClient({
           </div>
         )}
         {activityError && (
-          <div className="shrink-0 mb-2 rounded-xl bg-rose-950/80 border border-rose-500/40 p-2.5 text-xs text-rose-300 flex items-center gap-2 animate-in fade-in">
+          <div className="shrink-0 m-2 sm:m-0 sm:mb-1 rounded-xl bg-rose-950/80 border border-rose-500/40 px-3 py-2 text-xs text-rose-300 flex items-center gap-2 animate-in fade-in">
             <svg className="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -627,535 +662,537 @@ export function FriendDetailClient({
           </div>
         )}
 
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch overflow-hidden">
-          {/* ================= LEFT: HABITS & ARCHIVED GOALS ================= */}
-          <div
-            className={`lg:col-span-6 flex flex-col min-h-0 overflow-y-auto space-y-4 pr-1 ${
-              mobileTab === "habits" ? "flex" : "hidden lg:flex"
-            }`}
-          >
-            {/* Top Subheader for Habits: Active Habits vs Completed Goals */}
-            <div className="shrink-0 flex items-center justify-between pb-2 border-b border-zinc-800">
-              <div className="flex items-center gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setHabitsSubTab("active")}
-                  className={`px-3 py-1 rounded-lg font-semibold transition ${
-                    habitsSubTab === "active"
-                      ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  Active Habits ({activeActivities.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHabitsSubTab("archive")}
-                  className={`px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 ${
-                    habitsSubTab === "archive"
-                      ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <span>Completed Goals</span>
-                  {archivedActivities.length > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">
-                      {archivedActivities.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
+        {/* ================= LEFT COLUMN: HABITS & COMPLETED GOALS ARCHIVE ================= */}
+        <div
+          className={`lg:w-1/2 flex-col min-h-0 overflow-y-auto space-y-4 p-3 sm:p-0 pr-1 ${
+            mobileTab === "habits" ? "flex flex-1" : "hidden lg:flex"
+          }`}
+        >
+          {/* Subheader: Active Habits vs Completed Goals */}
+          <div className="shrink-0 flex items-center justify-between pb-2 border-b border-zinc-800">
+            <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs">
               <button
                 type="button"
-                onClick={() => {
-                  setIsAddingActivity(!isAddingActivity);
-                  setActivityError("");
-                }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition active:scale-95 shadow-md shadow-indigo-600/20 shrink-0"
+                onClick={() => setHabitsSubTab("active")}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  habitsSubTab === "active"
+                    ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
+                    : "text-zinc-400 hover:text-white"
+                }`}
               >
-                <span className="text-sm font-bold leading-none">+</span>
-                <span>Propose</span>
+                Active ({activeActivities.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHabitsSubTab("archive")}
+                className={`px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 ${
+                  habitsSubTab === "archive"
+                    ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                <span>Completed Goals</span>
+                {archivedActivities.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">
+                    {archivedActivities.length}
+                  </span>
+                )}
               </button>
             </div>
 
-            {/* Propose Habit Form */}
-            {isAddingActivity && (
-              <form
-                onSubmit={handleProposeActivity}
-                className="shrink-0 rounded-2xl border border-zinc-700/80 bg-zinc-900/95 p-4 space-y-3.5 shadow-xl animate-in fade-in"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">Propose an Activity</h3>
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddingActivity(!isAddingActivity);
+                setActivityError("");
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition active:scale-95 shadow-md shadow-indigo-600/20 shrink-0"
+            >
+              <span className="text-sm font-bold leading-none">+</span>
+              <span>Propose</span>
+            </button>
+          </div>
+
+          {/* Propose Habit Form */}
+          {isAddingActivity && (
+            <form
+              onSubmit={handleProposeActivity}
+              className="shrink-0 rounded-2xl border border-zinc-700/80 bg-zinc-900/95 p-4 space-y-3 shadow-xl animate-in fade-in"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">Propose an Activity</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingActivity(false)}
+                  className="text-xs text-zinc-400 hover:text-white"
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                  Activity Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={activityTitle}
+                  onChange={(e) => setActivityTitle(e.target.value)}
+                  placeholder="e.g. Morning Workout, Daily Reading..."
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Frequency Target
+                </label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsAddingActivity(false)}
-                    className="text-xs text-zinc-400 hover:text-white"
+                    onClick={() => setFrequency("DAILY")}
+                    className={`rounded-xl p-2.5 border text-left transition ${
+                      frequency === "DAILY"
+                        ? "border-indigo-500 bg-indigo-950/40 text-white"
+                        : "border-zinc-800 bg-zinc-800/40 text-zinc-400"
+                    }`}
                   >
-                    ✕ Cancel
+                    <span className="font-semibold text-xs block">Daily</span>
+                    <span className="text-[10px] text-zinc-500">Every day</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFrequency("X_TIMES_A_WEEK")}
+                    className={`rounded-xl p-2.5 border text-left transition ${
+                      frequency === "X_TIMES_A_WEEK"
+                        ? "border-indigo-500 bg-indigo-950/40 text-white"
+                        : "border-zinc-800 bg-zinc-800/40 text-zinc-400"
+                    }`}
+                  >
+                    <span className="font-semibold text-xs block">Times per Week</span>
+                    <span className="text-[10px] text-zinc-500">Flexible target</span>
                   </button>
                 </div>
+              </div>
 
+              {frequency === "X_TIMES_A_WEEK" && (
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                    Activity Name
+                    Days per Week: {frequencyCount}
                   </label>
                   <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={activityTitle}
-                    onChange={(e) => setActivityTitle(e.target.value)}
-                    placeholder="e.g. Morning Workout, Daily Reading..."
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                    type="range"
+                    min={1}
+                    max={6}
+                    value={frequencyCount}
+                    onChange={(e) => setFrequencyCount(parseInt(e.target.value, 10))}
+                    className="w-full accent-indigo-500"
                   />
                 </div>
+              )}
 
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
-                    Frequency Target
+                  <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                    Start Date
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFrequency("DAILY")}
-                      className={`rounded-xl p-2.5 border text-left transition ${
-                        frequency === "DAILY"
-                          ? "border-indigo-500 bg-indigo-950/40 text-white"
-                          : "border-zinc-800 bg-zinc-800/40 text-zinc-400"
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                    End Date (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingActivity(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingProposal}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-50"
+                >
+                  {isSubmittingProposal ? "Sending..." : "Send Proposal"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ACTIVE HABITS LIST */}
+          {habitsSubTab === "active" && (
+            <div className="space-y-3">
+              {activeActivities.length === 0 ? (
+                <div className="text-center py-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-2">
+                  <p className="text-sm font-semibold text-zinc-300">No active habits yet</p>
+                  <p className="text-xs text-zinc-500 max-w-xs mx-auto">
+                    Propose a habit above to start tracking daily punch-ins with {friend.name}!
+                  </p>
+                </div>
+              ) : (
+                activeActivities.map((act) => {
+                  const isGoalMet = Boolean(act.isGoalReached);
+
+                  return (
+                    <div
+                      key={act.id}
+                      className={`rounded-2xl p-3.5 sm:p-4 border transition-all ${
+                        isGoalMet
+                          ? "bg-emerald-950/20 border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.12)]"
+                          : "bg-zinc-900/60 border-zinc-800/80"
                       }`}
                     >
-                      <span className="font-semibold text-xs block">Daily</span>
-                      <span className="text-[10px] text-zinc-500">Every day</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFrequency("X_TIMES_A_WEEK")}
-                      className={`rounded-xl p-2.5 border text-left transition ${
-                        frequency === "X_TIMES_A_WEEK"
-                          ? "border-indigo-500 bg-indigo-950/40 text-white"
-                          : "border-zinc-800 bg-zinc-800/40 text-zinc-400"
-                      }`}
-                    >
-                      <span className="font-semibold text-xs block">Times per Week</span>
-                      <span className="text-[10px] text-zinc-500">Flexible target</span>
-                    </button>
-                  </div>
-                </div>
-
-                {frequency === "X_TIMES_A_WEEK" && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                      Days per Week: {frequencyCount}
-                    </label>
-                    <input
-                      type="range"
-                      min={1}
-                      max={6}
-                      value={frequencyCount}
-                      onChange={(e) => setFrequencyCount(parseInt(e.target.value, 10))}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                      End Date (Optional)
-                    </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingActivity(false)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingProposal}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-50"
-                  >
-                    {isSubmittingProposal ? "Sending..." : "Send Proposal"}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* TAB 1: ACTIVE HABITS */}
-            {habitsSubTab === "active" && (
-              <div className="space-y-3">
-                {activeActivities.length === 0 ? (
-                  <div className="text-center py-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-2.5">
-                    <p className="text-sm font-semibold text-zinc-300">No active shared habits</p>
-                    <p className="text-xs text-zinc-500 max-w-xs mx-auto">
-                      Propose a habit to start tracking daily punch-ins and cheering each other on!
-                    </p>
-                  </div>
-                ) : (
-                  activeActivities.map((act) => {
-                    const isGoalMet = Boolean(act.isGoalReached);
-
-                    return (
-                      <div
-                        key={act.id}
-                        className={`rounded-2xl p-3.5 sm:p-4 border transition-all ${
-                          isGoalMet
-                            ? "bg-emerald-950/20 border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.12)]"
-                            : "bg-zinc-900/60 border-zinc-800/80"
-                        }`}
-                      >
-                        {/* Title & Actions */}
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-bold text-sm sm:text-base text-white">{act.title}</h4>
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
-                              {act.frequency === "DAILY" ? "Daily" : `${act.frequencyCount}x / wk`}
-                            </span>
-                            {act.endDate && (
-                              <span className="text-[10px] text-zinc-400">
-                                Until {formatDateOnly(act.endDate)}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isGoalMet && (
-                              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                Goal Reached!
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenCalendar(act.id)}
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
-                              title="Inspect History"
-                            >
-                              <CalendarIcon className="h-4 w-4 text-indigo-400" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Status row */}
-                        <div className="mb-2.5 rounded-xl bg-zinc-950/70 p-2 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`h-2 w-2 rounded-full shrink-0 ${
-                                act.hasFriendPunchedToday ? "bg-emerald-400" : "bg-zinc-600"
-                              }`}
-                            />
-                            {act.hasFriendPunchedToday ? (
-                              <p className="text-zinc-200">
-                                <span className="font-semibold text-emerald-300">{friend.name}</span> punched at{" "}
-                                <span className="font-mono text-emerald-400" suppressHydrationWarning>
-                                  {formatTimeOnly(act.friendPunchedAt)}
-                                </span>
-                              </p>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-zinc-400">{friend.name} hasn&apos;t punched today</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleNudgeFriend(act.title)}
-                                  className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
-                                >
-                                  ⚡ Nudge
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {act.frequency === "X_TIMES_A_WEEK" && (
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-sm sm:text-base text-white">{act.title}</h4>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
+                            {act.frequency === "DAILY" ? "Daily" : `${act.frequencyCount}x / wk`}
+                          </span>
+                          {act.endDate && (
                             <span className="text-[10px] text-zinc-400">
-                              Week: <span className="text-indigo-300 font-medium">You ({act.userWeekCount || 0}/{act.frequencyCount})</span> •{" "}
-                              <span className="text-violet-300 font-medium">{friend.name} ({act.friendWeekCount || 0}/{act.frequencyCount})</span>
+                              Until {formatDateOnly(act.endDate)}
                             </span>
                           )}
                         </div>
 
-                        {/* Punch In Button */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] text-zinc-400">
-                            {act.hasUserPunchedToday ? (
-                              <span className="text-emerald-400 font-medium flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" />
-                                <span>Punched at {formatTimeOnly(act.userPunchedAt)}</span>
-                              </span>
-                            ) : (
-                              "Resets daily"
-                            )}
-                          </span>
-
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isGoalMet && (
+                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                              Goal Reached!
+                            </span>
+                          )}
                           <button
                             type="button"
-                            disabled={act.hasUserPunchedToday || punchingInId === act.id}
-                            onClick={() => handlePunchIn(act.id)}
-                            className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
-                              act.hasUserPunchedToday
-                                ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default"
-                                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95"
-                            }`}
+                            onClick={() => handleOpenCalendar(act.id)}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                            title="Inspect History"
                           >
-                            {punchingInId === act.id ? (
-                              "..."
-                            ) : act.hasUserPunchedToday ? (
-                              <>
-                                <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-400" />
-                                <span>Done</span>
-                              </>
-                            ) : (
-                              "Punch In"
-                            )}
+                            <CalendarIcon className="h-4 w-4 text-indigo-400" />
                           </button>
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
 
-            {/* TAB 2: COMPLETED GOALS & ARCHIVE */}
-            {habitsSubTab === "archive" && (
-              <div className="space-y-3">
-                {archivedActivities.length === 0 ? (
-                  <div className="text-center py-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-2">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
-                      <CheckCircleIcon className="w-5 h-5 opacity-40 text-emerald-400" />
-                    </div>
-                    <p className="text-sm font-semibold text-zinc-300">No completed goals yet</p>
-                    <p className="text-xs text-zinc-500 max-w-xs mx-auto">
-                      Habits that have an end date will automatically move to this completed archive once finished.
-                    </p>
-                  </div>
-                ) : (
-                  archivedActivities.map((act) => (
-                    <div
-                      key={act.id}
-                      className="rounded-2xl p-3.5 sm:p-4 border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900/80 transition"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-bold text-sm sm:text-base text-zinc-200 line-through decoration-zinc-500">
-                              {act.title}
-                            </h4>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
-                              Completed Goal
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">
-                            Finished on {formatDateOnly(act.endDate)}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCalendar(act.id)}
-                          className="px-2.5 py-1 rounded-lg text-xs text-indigo-400 hover:text-indigo-300 bg-zinc-800/80 border border-zinc-700 transition flex items-center gap-1"
-                          title="View Historical Calendar"
-                        >
-                          <CalendarIcon className="w-3.5 h-3.5" />
-                          <span>History</span>
-                        </button>
-                      </div>
-
-                      <div className="rounded-xl bg-zinc-950/70 p-2 border border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
-                        <span>Frequency: {act.frequency === "DAILY" ? "Daily" : `${act.frequencyCount}x / week`}</span>
-                        <span className="text-emerald-400 font-medium">Archived</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ================= RIGHT: CHAT BOX & FLOATING ACTIVITIES ================= */}
-          <div
-            className={`lg:col-span-6 flex flex-col min-h-0 overflow-hidden ${
-              mobileTab === "chat" ? "flex" : "hidden lg:flex"
-            }`}
-          >
-            {/* Complete Chat Container: Fits exactly within remaining height */}
-            <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-zinc-800/80 bg-zinc-900/70 overflow-hidden shadow-2xl relative">
-              
-              {/* 1. FLOATING ACTIVITIES BAR: ONLY shows uncompleted active habits */}
-              {uncompletedTodayActivities.length > 0 ? (
-                <div className="shrink-0 border-b border-indigo-500/30 bg-gradient-to-r from-zinc-950 via-indigo-950/30 to-zinc-950 px-3 py-2 shadow-md z-20">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                      <span className="text-xs font-bold text-white tracking-tight truncate">
-                        Habits to Complete ({uncompletedTodayActivities.length})
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsFloatingActivitiesExpanded(!isFloatingActivitiesExpanded)}
-                      className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 font-medium transition shrink-0"
-                    >
-                      <span>{isFloatingActivitiesExpanded ? "Hide" : "Show"}</span>
-                      <span>{isFloatingActivitiesExpanded ? "▲" : "▼"}</span>
-                    </button>
-                  </div>
-
-                  {isFloatingActivitiesExpanded && (
-                    <div className="space-y-1.5 mt-2 max-h-36 overflow-y-auto pr-1">
-                      {uncompletedTodayActivities.map((act) => (
-                        <div
-                          key={act.id}
-                          className="flex items-center justify-between gap-2 p-2 rounded-xl bg-zinc-900/95 border border-zinc-800 shadow-sm"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <span className="font-semibold text-xs text-white truncate block">
-                              {act.title}
-                            </span>
-                            <p className="text-[10px] text-zinc-400 truncate">
-                              {act.hasFriendPunchedToday ? (
-                                <span className="text-emerald-400 font-medium">
-                                  {friend.name} punched at {formatTimeOnly(act.friendPunchedAt)}
-                                </span>
-                              ) : (
-                                <span className="text-zinc-500">
-                                  {friend.name} waiting
-                                </span>
-                              )}
+                      <div className="mb-2.5 rounded-xl bg-zinc-950/70 p-2 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-2 w-2 rounded-full shrink-0 ${
+                              act.hasFriendPunchedToday ? "bg-emerald-400" : "bg-zinc-600"
+                            }`}
+                          />
+                          {act.hasFriendPunchedToday ? (
+                            <p className="text-zinc-200">
+                              <span className="font-semibold text-emerald-300">{friend.name}</span> punched at{" "}
+                              <span className="font-mono text-emerald-400" suppressHydrationWarning>
+                                {formatTimeOnly(act.friendPunchedAt)}
+                              </span>
                             </p>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {!act.hasFriendPunchedToday && (
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-zinc-400">{friend.name} hasn&apos;t punched today</span>
                               <button
                                 type="button"
                                 onClick={() => handleNudgeFriend(act.title)}
-                                className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold transition active:scale-95"
-                                title="Send reminder in chat"
+                                className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
                               >
                                 ⚡ Nudge
                               </button>
-                            )}
-
-                            <button
-                              type="button"
-                              disabled={punchingInId === act.id}
-                              onClick={() => handlePunchIn(act.id)}
-                              className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/25 active:scale-95 transition"
-                            >
-                              {punchingInId === act.id ? "..." : "Punch In"}
-                            </button>
-                          </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : activeActivities.length > 0 ? (
-                /* Minimized completed indicator */
-                <div className="shrink-0 border-b border-zinc-800/80 bg-zinc-950/60 px-3 py-1.5 flex items-center justify-between text-xs text-emerald-400 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>All habits completed today! 🎉</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab("habits")}
-                    className="text-[11px] text-zinc-400 hover:text-white underline"
-                  >
-                    View habits
-                  </button>
-                </div>
-              ) : null}
 
-              {/* 2. CHAT MESSAGES SCROLL CONTAINER: strictly internal scrolling */}
-              <div
-                ref={chatMessagesContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5 overscroll-contain"
-              >
-                {messages.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-800/60 flex items-center justify-center mb-2 text-zinc-500">
-                      <svg className="w-5 h-5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <p className="text-xs text-zinc-300 font-medium">No messages yet.</p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
-                      Say hi to {friend.name} and stay on track together!
-                    </p>
-                  </div>
-                ) : (
-                  messages.map((m) => {
-                    const isSelf = m.senderId === parseInt(sessionUser.id, 10);
-                    return (
-                      <div
-                        key={m.id}
-                        className={`flex flex-col ${isSelf ? "items-end" : "items-start"}`}
-                      >
-                        <div
-                          className={`rounded-2xl px-3.5 py-2 text-xs max-w-[85%] break-words shadow-sm ${
-                            isSelf
-                              ? "bg-indigo-600 text-white rounded-tr-sm"
-                              : "bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-tl-sm"
+                        {act.frequency === "X_TIMES_A_WEEK" && (
+                          <span className="text-[10px] text-zinc-400">
+                            Week: <span className="text-indigo-300 font-medium">You ({act.userWeekCount || 0}/{act.frequencyCount})</span> •{" "}
+                            <span className="text-violet-300 font-medium">{friend.name} ({act.friendWeekCount || 0}/{act.frequencyCount})</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-zinc-400">
+                          {act.hasUserPunchedToday ? (
+                            <span className="text-emerald-400 font-medium flex items-center gap-1">
+                              <CheckCircleIcon className="w-3 h-3" />
+                              <span>Punched at {formatTimeOnly(act.userPunchedAt)}</span>
+                            </span>
+                          ) : (
+                            "Resets daily"
+                          )}
+                        </span>
+
+                        <button
+                          type="button"
+                          disabled={act.hasUserPunchedToday || punchingInId === act.id}
+                          onClick={() => handlePunchIn(act.id)}
+                          className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                            act.hasUserPunchedToday
+                              ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default"
+                              : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95"
                           }`}
                         >
-                          {m.content}
-                        </div>
-                        <span
-                          className="text-[10px] text-zinc-500 mt-0.5 px-1"
-                          suppressHydrationWarning
-                        >
-                          {formatTimeOnly(m.createdAt)}
-                        </span>
+                          {punchingInId === act.id ? (
+                            "..."
+                          ) : act.hasUserPunchedToday ? (
+                            <>
+                              <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-400" />
+                              <span>Done</span>
+                            </>
+                          ) : (
+                            "Punch In"
+                          )}
+                        </button>
                       </div>
-                    );
-                  })
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* COMPLETED GOALS & ARCHIVE LIST */}
+          {habitsSubTab === "archive" && (
+            <div className="space-y-3">
+              {archivedActivities.length === 0 ? (
+                <div className="text-center py-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+                    <CheckCircleIcon className="w-5 h-5 opacity-40 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-zinc-300">No completed goals yet</p>
+                  <p className="text-xs text-zinc-500 max-w-xs mx-auto">
+                    Habits with an end date in the past will automatically archive here.
+                  </p>
+                </div>
+              ) : (
+                archivedActivities.map((act) => (
+                  <div
+                    key={act.id}
+                    className="rounded-2xl p-3.5 sm:p-4 border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900/80 transition"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-sm sm:text-base text-zinc-200 line-through decoration-zinc-500">
+                            {act.title}
+                          </h4>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+                            Completed Goal
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                          Finished on {formatDateOnly(act.endDate)}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCalendar(act.id)}
+                        className="px-2.5 py-1 rounded-lg text-xs text-indigo-400 hover:text-indigo-300 bg-zinc-800/80 border border-zinc-700 transition flex items-center gap-1"
+                        title="View Historical Calendar"
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        <span>History</span>
+                      </button>
+                    </div>
+
+                    <div className="rounded-xl bg-zinc-950/70 p-2 border border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
+                      <span>Frequency: {act.frequency === "DAILY" ? "Daily" : `${act.frequencyCount}x / week`}</span>
+                      <span className="text-emerald-400 font-medium">Archived</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ================= RIGHT COLUMN: CHAT & FLOATING ACTIVITIES ================= */}
+        <div
+          className={`lg:w-1/2 flex-col min-h-0 overflow-hidden ${
+            mobileTab === "chat" ? "flex flex-1" : "hidden lg:flex"
+          }`}
+        >
+          {/* Chat Container Box: 100% fits within remaining flex-1 space */}
+          <div className="flex-1 min-h-0 flex flex-col rounded-none sm:rounded-2xl border-0 sm:border border-zinc-800/80 bg-zinc-900/70 overflow-hidden shadow-2xl relative">
+            
+            {/* FLOATING UNPUNCHED ACTIVITIES: Pinned at top of chat */}
+            {uncompletedTodayActivities.length > 0 ? (
+              <div className="shrink-0 border-b border-indigo-500/30 bg-gradient-to-r from-zinc-950 via-indigo-950/30 to-zinc-950 px-3 py-2 shadow-md z-20">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                    <span className="text-xs font-bold text-white tracking-tight truncate">
+                      Habits to Complete ({uncompletedTodayActivities.length})
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFloatingActivitiesExpanded(!isFloatingActivitiesExpanded)}
+                    className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 font-medium transition shrink-0"
+                  >
+                    <span>{isFloatingActivitiesExpanded ? "Hide" : "Show"}</span>
+                    <span>{isFloatingActivitiesExpanded ? "▲" : "▼"}</span>
+                  </button>
+                </div>
+
+                {isFloatingActivitiesExpanded && (
+                  <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto pr-1">
+                    {uncompletedTodayActivities.map((act) => (
+                      <div
+                        key={act.id}
+                        className="flex items-center justify-between gap-2 p-2 rounded-xl bg-zinc-900/95 border border-zinc-800 shadow-sm"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-xs text-white truncate block">
+                            {act.title}
+                          </span>
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {act.hasFriendPunchedToday ? (
+                              <span className="text-emerald-400 font-medium">
+                                {friend.name} punched at {formatTimeOnly(act.friendPunchedAt)}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500">
+                                {friend.name} waiting
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!act.hasFriendPunchedToday && (
+                            <button
+                              type="button"
+                              onClick={() => handleNudgeFriend(act.title)}
+                              className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold transition active:scale-95"
+                              title="Send reminder in chat"
+                            >
+                              ⚡ Nudge
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            disabled={punchingInId === act.id}
+                            onClick={() => handlePunchIn(act.id)}
+                            className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/25 active:scale-95 transition"
+                          >
+                            {punchingInId === act.id ? "..." : "Punch In"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-
-              {/* 3. DOCKED MESSAGE INPUT: Always visible, never pushed below fold */}
-              <form
-                onSubmit={handleSendMessage}
-                className="shrink-0 p-2 sm:p-3 border-t border-zinc-800/80 bg-zinc-950/95 flex items-center gap-2"
-              >
-                <input
-                  type="text"
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
-                />
+            ) : activeActivities.length > 0 ? (
+              /* Minimized all-completed banner */
+              <div className="shrink-0 border-b border-zinc-800/80 bg-zinc-950/60 px-3 py-1.5 flex items-center justify-between text-xs text-emerald-400 font-medium">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>All habits completed today! 🎉</span>
+                </div>
                 <button
-                  type="submit"
-                  disabled={!messageText.trim() || isSendingMessage}
-                  className="rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold px-3.5 py-2 transition active:scale-95 shadow-md shadow-indigo-600/20 shrink-0"
+                  type="button"
+                  onClick={() => setMobileTab("habits")}
+                  className="text-[11px] text-zinc-400 hover:text-white underline"
                 >
-                  Send
+                  View habits
                 </button>
-              </form>
+              </div>
+            ) : null}
+
+            {/* CHAT MESSAGES SCROLL CONTAINER: strictly internal scrolling */}
+            <div
+              ref={chatMessagesContainerRef}
+              className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5 overscroll-contain"
+            >
+              {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-800/60 flex items-center justify-center mb-2 text-zinc-500">
+                    <svg className="w-5 h-5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <p className="text-xs text-zinc-300 font-medium">No messages yet.</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Say hi to {friend.name} and stay on track together!
+                  </p>
+                </div>
+              ) : (
+                messages.map((m) => {
+                  const isSelf = m.senderId === parseInt(sessionUser.id, 10);
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isSelf ? "items-end" : "items-start"}`}
+                    >
+                      <div
+                        className={`rounded-2xl px-3.5 py-2 text-xs max-w-[85%] break-words shadow-sm ${
+                          isSelf
+                            ? "bg-indigo-600 text-white rounded-tr-sm"
+                            : "bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-tl-sm"
+                        }`}
+                      >
+                        {m.content}
+                      </div>
+                      <span
+                        className="text-[10px] text-zinc-500 mt-0.5 px-1"
+                        suppressHydrationWarning
+                      >
+                        {formatTimeOnly(m.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
+
+            {/* DOCKED MESSAGE INPUT: Always 100% visible, completely unblocked, safe-area aware */}
+            <form
+              onSubmit={handleSendMessage}
+              className="shrink-0 p-2 sm:p-3 border-t border-zinc-800/80 bg-zinc-950/95 flex items-center gap-2 pb-[max(env(safe-area-inset-bottom),0.75rem)]"
+            >
+              <input
+                type="text"
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                onFocus={() => {
+                  setTimeout(() => {
+                    if (chatMessagesContainerRef.current) {
+                      chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
+                    }
+                  }, 250);
+                }}
+                placeholder="Type a message..."
+                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-base sm:text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
+              />
+              <button
+                type="submit"
+                disabled={!messageText.trim() || isSendingMessage}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold px-4 py-2.5 transition active:scale-95 shadow-md shadow-indigo-600/20 shrink-0"
+              >
+                Send
+              </button>
+            </form>
           </div>
         </div>
       </main>
@@ -1369,15 +1406,6 @@ export function FriendDetailClient({
           </div>
         </div>
       )}
-
-      {/* Universal Mobile Bottom Navigation Bar: fixed at bottom */}
-      <div className="shrink-0">
-        <BottomNav
-          activeTab="messages"
-          unreadNotifications={unreadNotifications}
-          pendingRequests={pendingRequests}
-        />
-      </div>
     </div>
   );
 }

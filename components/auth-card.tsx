@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { registerUser } from "@/app/actions/auth";
-import { EyeIcon, EyeOffIcon, ArrowRightIcon, SparklesIcon } from "./icons";
+import { registerUser, requestPasswordReset } from "@/app/actions/auth";
+import { EyeIcon, EyeOffIcon, ArrowRightIcon, SparklesIcon, CheckCircleIcon } from "./icons";
 
 interface AuthCardProps {
-  initialMode?: "login" | "register";
+  initialMode?: "login" | "register" | "forgot";
   redirectOnSuccess?: boolean;
 }
 
@@ -15,10 +15,10 @@ export function AuthCard({
   initialMode = "register",
   redirectOnSuccess = false,
 }: AuthCardProps) {
-  const router = useRouter();
-  const [mode, setMode] = useState<"login" | "register">(initialMode);
+  const [mode, setMode] = useState<"login" | "register" | "forgot">(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error" | "info";
     text: string;
@@ -30,14 +30,46 @@ export function AuthCard({
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
 
+  // Reset link info
+  const [resetResult, setResetResult] = useState<{
+    resetUrl?: string;
+    resetToken?: string;
+    message?: string;
+  } | null>(null);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setStatusMessage(null);
+    setResetResult(null);
 
     try {
+      if (mode === "forgot") {
+        if (!email.trim() || !email.includes("@")) {
+          setStatusMessage({ type: "error", text: "Please enter a valid email address." });
+          setIsLoading(false);
+          return;
+        }
+
+        const res = await requestPasswordReset(email);
+        if (res.error) {
+          setStatusMessage({ type: "error", text: res.error });
+        } else {
+          setResetResult({
+            resetUrl: res.resetUrl,
+            resetToken: res.resetToken,
+            message: res.message,
+          });
+          setStatusMessage({
+            type: "success",
+            text: res.message || "Password reset link ready.",
+          });
+        }
+        setIsLoading(false);
+        return;
+      }
+
       if (mode === "register") {
-        // Enforce password criteria: min 8 chars, 1 uppercase, 1 number, 1 symbol
         if (password.length < 8) {
           setStatusMessage({ type: "error", text: "Password must be at least 8 characters long." });
           setIsLoading(false);
@@ -59,7 +91,6 @@ export function AuthCard({
           return;
         }
 
-        // 1. Server Action: validate, bcrypt-hash, save to PostgreSQL via Prisma
         const regResult = await registerUser({ name, email, password });
         if (regResult.error) {
           setStatusMessage({ type: "error", text: regResult.error });
@@ -67,7 +98,6 @@ export function AuthCard({
           return;
         }
 
-        // 2. Sign in with the newly created credentials
         const signInResult = await signIn("credentials", {
           email: email.trim().toLowerCase(),
           password,
@@ -84,7 +114,6 @@ export function AuthCard({
           return;
         }
 
-        // 3. Navigate to /friends with full session cookie handshake
         window.location.href = "/";
       } else {
         // Sign In Flow
@@ -103,7 +132,6 @@ export function AuthCard({
           return;
         }
 
-        // Navigate to /friends with full session cookie handshake
         window.location.href = "/";
       }
     } catch (err) {
@@ -113,6 +141,15 @@ export function AuthCard({
         text: "An unexpected error occurred. Please try again.",
       });
       setIsLoading(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (resetResult?.resetUrl) {
+      const fullUrl = window.location.origin + resetResult.resetUrl;
+      navigator.clipboard.writeText(fullUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 3000);
     }
   };
 
@@ -130,6 +167,7 @@ export function AuthCard({
             onClick={() => {
               setMode("register");
               setStatusMessage(null);
+              setResetResult(null);
             }}
             className={`flex-1 rounded-lg py-2 transition-all duration-200 text-center ${
               mode === "register"
@@ -144,14 +182,15 @@ export function AuthCard({
             onClick={() => {
               setMode("login");
               setStatusMessage(null);
+              setResetResult(null);
             }}
             className={`flex-1 rounded-lg py-2 transition-all duration-200 text-center ${
-              mode === "login"
+              mode === "login" || mode === "forgot"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white font-semibold"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
             }`}
           >
-            Sign In
+            {mode === "forgot" ? "Reset Password" : "Sign In"}
           </button>
         </div>
 
@@ -160,11 +199,15 @@ export function AuthCard({
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
             {mode === "register"
               ? "Join Your Friends on Punchly"
+              : mode === "forgot"
+              ? "Reset Your Password"
               : "Welcome Back"}
           </h2>
           <p className="mt-1.5 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
             {mode === "register"
               ? "Start tracking shared activities and celebrating streaks together."
+              : mode === "forgot"
+              ? "Enter your account email address to generate a password reset link."
               : "Sign in to check off today's activities and view friend updates."}
           </p>
         </div>
@@ -181,12 +224,55 @@ export function AuthCard({
             }`}
             role="status"
           >
-            <SparklesIcon className="h-4 w-4 shrink-0 mt-0.5" />
+            {statusMessage.type === "success" ? (
+              <CheckCircleIcon className="h-4 w-4 shrink-0 mt-0.5 text-emerald-500" />
+            ) : (
+              <SparklesIcon className="h-4 w-4 shrink-0 mt-0.5" />
+            )}
             <span>{statusMessage.text}</span>
           </div>
         )}
 
-        {/* Semantic Form */}
+        {/* Reset link prepared card (in forgot mode) */}
+        {mode === "forgot" && resetResult?.resetUrl && (
+          <div className="mb-5 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 space-y-3 animate-in fade-in">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              <CheckCircleIcon className="h-4 w-4 shrink-0" />
+              <span>Reset Link Ready (Valid for 1 Hour)</span>
+            </div>
+            
+            <p className="text-xs text-zinc-600 dark:text-zinc-300">
+              Click below to proceed to the secure password reset page:
+            </p>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <Link
+                href={resetResult.resetUrl}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-emerald-600/20 active:scale-95 transition-all text-center"
+              >
+                <span>Proceed to Reset Password</span>
+                <ArrowRightIcon className="h-4 w-4" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+              >
+                {copiedLink ? (
+                  <>
+                    <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Link Copied to Clipboard!</span>
+                  </>
+                ) : (
+                  <span>📋 Copy Direct Reset Link</span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "register" && (
             <div>
@@ -212,13 +298,13 @@ export function AuthCard({
 
           <div>
             <label
-              htmlFor={mode === "register" ? "register-email" : "login-email"}
+              htmlFor={mode === "register" ? "register-email" : mode === "forgot" ? "forgot-email" : "login-email"}
               className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5"
             >
               Email Address
             </label>
             <input
-              id={mode === "register" ? "register-email" : "login-email"}
+              id={mode === "register" ? "register-email" : mode === "forgot" ? "forgot-email" : "login-email"}
               name="email"
               type="email"
               inputMode="email"
@@ -231,66 +317,67 @@ export function AuthCard({
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor={
-                  mode === "register" ? "register-password" : "login-password"
-                }
-                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider"
-              >
-                Password
-              </label>
-              {mode === "login" && (
+          {mode !== "forgot" && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor={
+                    mode === "register" ? "register-password" : "login-password"
+                  }
+                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider"
+                >
+                  Password
+                </label>
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setStatusMessage(null);
+                      setResetResult(null);
+                    }}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  id={
+                    mode === "register" ? "register-password" : "login-password"
+                  }
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={
+                    mode === "register" ? "new-password" : "current-password"
+                  }
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 px-3.5 py-2.5 pr-10 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-colors"
+                />
                 <button
                   type="button"
-                  onClick={() =>
-                    setStatusMessage({
-                      type: "info",
-                      text: "Password reset feature will be connected in next milestone.",
-                    })
-                  }
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  Forgot password?
+                  {showPassword ? (
+                    <EyeOffIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
                 </button>
+              </div>
+              {mode === "register" && (
+                <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Must be at least 8 characters and include at least one uppercase letter, one number, and one symbol.
+                </p>
               )}
             </div>
-            <div className="relative">
-              <input
-                id={
-                  mode === "register" ? "register-password" : "login-password"
-                }
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete={
-                  mode === "register" ? "new-password" : "current-password"
-                }
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 px-3.5 py-2.5 pr-10 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-colors"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 focus:outline-none"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? (
-                  <EyeOffIcon className="h-4 w-4" />
-                ) : (
-                  <EyeIcon className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-            {mode === "register" && (
-              <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                Must be at least 8 characters and include at least one uppercase letter, one number, and one symbol.
-              </p>
-            )}
-          </div>
+          )}
 
           {mode === "login" ? (
             <div className="flex items-center justify-between text-xs">
@@ -304,7 +391,7 @@ export function AuthCard({
                 Remember this device
               </label>
             </div>
-          ) : (
+          ) : mode === "register" ? (
             <div className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400">
               <input
                 id="pledge"
@@ -317,7 +404,7 @@ export function AuthCard({
                 I agree to the friendly accountability pledge & terms.
               </label>
             </div>
-          )}
+          ) : null}
 
           <button
             type="submit"
@@ -329,12 +416,32 @@ export function AuthCard({
             ) : (
               <>
                 <span>
-                  {mode === "register" ? "Create Free Account" : "Sign In to Punchly"}
+                  {mode === "register"
+                    ? "Create Free Account"
+                    : mode === "forgot"
+                    ? "Generate Reset Link"
+                    : "Sign In to Punchly"}
                 </span>
                 <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </>
             )}
           </button>
+
+          {mode === "forgot" && (
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setStatusMessage(null);
+                  setResetResult(null);
+                }}
+                className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
+              >
+                ← Back to Sign In
+              </button>
+            </div>
+          )}
         </form>
 
       </div>

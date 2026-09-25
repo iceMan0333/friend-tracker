@@ -1,173 +1,142 @@
-# Punchly
+# Punchly 🥊
 
-Punchly is a full-stack web application designed to help friends stay connected, keep track of shared activities, and see each other's progress.
+**Punchly** is a full-stack, mobile-first social habit tracking and accountability platform. Designed for friends to stay connected, build consistent routines together, track daily punch-ins, keep streaks alive, and celebrate completed milestones.
 
-The project is being built as a portfolio project with a focus on full-stack development, database design, authentication, real-time communication, and clean software architecture.
+---
 
-## Project Status
+## 🌟 Project Status: ✅ Completed (v1.0)
 
-🚧 **Currently in development**
+All primary features, database architectures, real-time mechanisms, security flows, and mobile responsive layouts have been completed and verified for production.
 
-The initial project setup and database foundation are complete.
+---
 
-### Completed
+## 🚀 Key Features
 
-* Next.js application setup
-* TypeScript configuration
-* PostgreSQL database setup
-* Prisma ORM configuration
-* Prisma database schema
-* Initial database migration
-* Prisma Client and PostgreSQL driver adapter
-* Git version control
-* GitHub repository setup
+### 1. 🥊 Shared Habit Tracking & Daily Punch-Ins
+* **Custom Habit Proposals**: Propose habits with flexible cadences — **Daily** or **X times per week**, with optional target completion dates.
+* **Proposal Workflow**: Clean accept/decline workflows that instantly sync with notification alerts.
+* **Daily Punch-In Routine**: Check off habits each day with instant feedback and live status syncing.
+* **Completed Goals Archive**: Habits that reach their target end date automatically graduate into a dedicated **"Completed Goals"** archive.
 
-### Planned Features
+### 2. 📅 Interactive Streak & Accountability Calendar
+* **Color-Coded Accountability Visualization**:
+  * 🟢 **Green**: Both you and your friend punched in!
+  * 🟡 **Yellow**: One partner punched in — click to view exact punch timestamps.
+  * 🔴 **Red**: Missed routine day.
+  * ⚪ **Neutral**: Rest day / weekly goal already satisfied.
+* **Month Navigation & History**: Browse through previous months to review habit consistency over time.
 
-* User registration and authentication
-* User profiles
-* Friend requests and friend management
-* Shared activities
-* Recurring daily and weekly activities
-* Activity completion tracking
-* Friend activity status
-* Private messaging
-* Notifications
-* Responsive user interface
+### 3. 💬 1-on-1 Direct Messaging & Instant Nudges
+* **Dedicated Friend Chat Rooms**: Fast, private messaging directly connected to your shared habits.
+* **⚡ One-Tap Nudge**: Send pre-formatted accountability reminders to prompt your friend to punch in for the day.
+* **Floating Habits Banner**: Uncompleted habits float pinned above the chat feed with direct punch buttons so you never lose track while texting.
 
-## Tech Stack
+### 4. 📱 Mobile-First Responsive UX
+* **Docked Chat Layout**: WhatsApp/Telegram-style bottom input bar that stays permanently visible and docked to the viewport.
+* **Dynamic Keyboard Adaptation**: Utilizes the modern `window.visualViewport` API and Next.js `interactiveWidget: "resizes-content"` to ensure virtual keyboards never push the typing input off-screen.
+* **Single Mobile Header**: Maximizes screen real estate on mobile devices by suppressing desktop banners in dedicated chat threads.
+* **Safe-Area Insets**: Full native support for iOS home indicators and Android gesture bars.
 
-### Frontend
+### 5. 👥 Friends & Social Discovery
+* **Unique User Tags**: Custom handle system (e.g. `@alex`, `@sarah`) for easy identification and search.
+* **Friend Request Hub**: Send, accept, or decline friend requests with real-time pending badges.
+* **Public & Personal Profiles**: Customizable profile avatars, bios, and accountability stats.
 
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
+### 6. 🔔 Central Notification Center
+* Synchronized alerts for friend requests, habit proposals, approvals, and nudges.
+* Actionable notifications — accepting an activity directly from messages or notifications keeps both views instantly in sync.
 
-### Backend
+### 7. 🔐 Robust Authentication & Password Management
+* **Secure Credentials Auth**: Powered by NextAuth.js v5 with bcrypt hashing (12 salt rounds).
+* **Password Reset Flow**: Cryptographically secure 32-byte hex token generation with 1-hour expiration.
+* **Dedicated Reset Page**: `/reset-password?token=...` with real-time password criteria validation (8+ characters, uppercase, number, symbol).
+* **In-Profile Password Updates**: Authenticated users can update their account password directly from their profile settings.
 
-* Next.js
-* Prisma ORM
-* PostgreSQL
+---
 
-### Development Tools
+## 🛠️ Technology Stack
 
-* Git
-* GitHub
-* ESLint
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend Framework** | **Next.js 16** (App Router, Turbopack, Server Actions) |
+| **UI & Styling** | **React 19**, **Tailwind CSS v4** |
+| **Authentication** | **NextAuth.js v5**, **bcryptjs**, Cryptographic tokens |
+| **Database & ORM** | **Prisma ORM**, **Neon Lakebase PostgreSQL** |
+| **Deployment** | **Vercel** CI/CD with automated dual-remote GitHub sync |
+| **Language & Tooling** | **TypeScript 5**, ESLint |
 
-## Database Design
+---
 
-The application uses PostgreSQL with Prisma as the ORM.
+## 🗄️ Database Architecture
 
-The current database is designed around the following core entities:
+The application is backed by a PostgreSQL database managed via Prisma ORM:
 
-* `User` — application users
-* `FriendRequest` — requests between users
-* `Friendship` — accepted friendships
-* `Activity` — shared activities
-* `ActivityParticipant` — users participating in activities
-* `ActivityOccurrence` — individual occurrences of recurring activities
-* `ActivityCompletion` — completion status for each participant
-* `Message` — messages between users
+* `User`: User accounts, hashed credentials, unique `@tag`, profile bio, and avatars.
+* `Friendship`: Bi-directional friendship records between users.
+* `FriendRequest`: Pending, accepted, or declined connection requests.
+* `Activity`: Shared habits, frequency configuration, target dates, and statuses.
+* `ActivityPunchIn`: Daily timestamped completion records per user per habit.
+* `Message`: Direct chat messages between friends.
+* `Notification`: Actionable in-app alerts and proposal notifications.
+* `PasswordResetToken`: Time-limited, single-use security tokens for password resets.
 
-Recurring activities use separate occurrences and completion records so that each user can have an individual completion status for the same activity.
+---
 
-## Getting Started
+## 🏁 Getting Started
 
 ### Prerequisites
-
-Make sure you have the following installed:
-
-* Node.js
-* npm
-* PostgreSQL
+* **Node.js** (v18.17+ or v20+)
+* **npm** or **pnpm**
+* A **PostgreSQL** database (e.g. [Neon](https://neon.tech))
 
 ### Installation
 
-Clone the repository:
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/iceMan0333/friend-tracker.git
+   cd friend-tracker
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables**:
+   Create a `.env` file in the root directory:
+   ```env
+   DATABASE_URL="postgresql://user:password@host/neondb?sslmode=require"
+   AUTH_SECRET="your-random-generated-secret"
+   NEXTAUTH_URL="http://localhost:3000"
+   ```
+
+4. **Sync Database Schema**:
+   ```bash
+   npx prisma db push
+   npx prisma generate
+   ```
+
+5. **Start Development Server**:
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🏗️ Production Build
+
+To test the production build locally:
 
 ```bash
-git clone https://github.com/iceMan0333/friend-tracker.git
-cd friend-tracker
+npm run build
+npm run start
 ```
 
-Install dependencies:
+---
 
-```bash
-npm install
-```
-
-Create a `.env` file in the project root and add your PostgreSQL connection string:
-
-```env
-DATABASE_URL="postgresql://USERNAME:PASSWORD@localhost:5432/friend_tracker"
-```
-
-Run the database migrations:
-
-```bash
-npx prisma migrate dev
-```
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-Open:
-
-```text
-http://localhost:3000
-```
-
-## Environment Variables
-
-The application uses environment variables for configuration.
-
-Do not commit `.env` to GitHub. It contains private database credentials.
-
-## Development
-
-The project follows an incremental development approach:
-
-```text
-Feature → Test → Commit → Documentation → Next Feature
-```
-
-Major features will be developed and committed separately to maintain a clear project history.
-
-## Project Structure
-
-```text
-friend-tracker/
-├── app/                    # Next.js application
-├── lib/                    # Shared application utilities
-│   └── prisma.ts           # Prisma Client
-├── prisma/
-│   ├── migrations/         # Database migrations
-│   └── schema.prisma       # Database schema
-├── public/                 # Static assets
-├── .env                    # Local environment variables
-├── prisma.config.ts        # Prisma configuration
-├── package.json
-└── README.md
-```
-
-## Future Improvements
-
-As development continues, the project may be expanded with:
-
-* Real-time chat
-* Notifications
-* Activity reminders
-* Improved activity scheduling
-* Mobile-friendly interface
-* Deployment to a production environment
-* Automated testing
-
-## Author
+## 👤 Author
 
 **Samin Yasar Ishraq**
-
+* GitHub: [@iceMan0333](https://github.com/iceMan0333)

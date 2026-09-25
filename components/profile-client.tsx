@@ -7,6 +7,7 @@ import { SparklesIcon, ShieldCheckIcon } from "./icons";
 import { AppHeader } from "./app-header";
 import { BottomNav } from "./bottom-nav";
 import { updateProfile } from "@/app/actions/profile";
+import { changePasswordFromProfile } from "@/app/actions/auth";
 
 interface ProfileUser {
   id: string;
@@ -55,6 +56,58 @@ export function ProfileClient({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Security & Password change states
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordStatus(null);
+
+    if (newPassword.length < 8) {
+      setPasswordStatus({ type: "error", text: "New password must be at least 8 characters long." });
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordStatus({ type: "error", text: "New passwords do not match." });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await changePasswordFromProfile({
+        currentPassword,
+        newPassword,
+      });
+
+      if (res.error) {
+        setPasswordStatus({ type: "error", text: res.error });
+      } else {
+        setPasswordStatus({ type: "success", text: res.message || "Password updated successfully!" });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+        setTimeout(() => {
+          setPasswordStatus(null);
+          setShowPasswordSection(false);
+        }, 3000);
+      }
+    } catch (err) {
+      console.error(err);
+      setPasswordStatus({ type: "error", text: "Failed to update password. Please try again." });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   // Handle client-side profile picture upload and compression
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,6 +354,110 @@ export function ProfileClient({
                 </p>
               </div>
             </div>
+
+            {/* Account & Security Card (only for own profile) */}
+            {isOwnProfile && (
+              <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheckIcon className="h-4 w-4 text-indigo-400" />
+                    <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                      Account & Security
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordSection(!showPasswordSection);
+                      setPasswordStatus(null);
+                    }}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
+                  >
+                    {showPasswordSection ? "Hide" : "Change Password"}
+                  </button>
+                </div>
+
+                {showPasswordSection && (
+                  <form onSubmit={handlePasswordChange} className="mt-4 pt-4 border-t border-zinc-800 space-y-3.5 animate-in fade-in">
+                    {passwordStatus && (
+                      <div
+                        className={`rounded-xl p-3 text-xs border ${
+                          passwordStatus.type === "success"
+                            ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                            : "bg-rose-950/40 border-rose-800/60 text-rose-300"
+                        }`}
+                      >
+                        {passwordStatus.text}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min 8 characters"
+                          className="w-full rounded-xl border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
+                          Confirm New Password
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          placeholder="Repeat new password"
+                          className="w-full rounded-xl border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPasswordSection(false);
+                          setPasswordStatus(null);
+                        }}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isChangingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+                        className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-semibold text-white transition-all shadow-md shadow-indigo-600/20"
+                      >
+                        {isChangingPassword ? "Updating..." : "Update Password"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           /* ----------------- EDIT PROFILE FORM ----------------- */
